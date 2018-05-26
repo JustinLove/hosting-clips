@@ -1,11 +1,17 @@
-module View exposing (Msg(..), view)
+module View exposing (Msg(..), Clip, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on)
+import Time exposing (Time)
 
 type Msg
   = None
+
+type alias Clip =
+  { id : String
+  , embedUrl : String
+  }
 
 css = """
 body {
@@ -17,4 +23,5 @@ body {
 view model = 
   div []
     [ text "view"
+    , text <| toString model.clips
     ]

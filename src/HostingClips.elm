@@ -3,12 +3,14 @@ module HostingClips exposing (..)
 import Twitch.Deserialize
 import Twitch exposing (helix)
 import TwitchId
-import View
+import View exposing (Clip)
 
 import Html
 import Navigation exposing (Location)
 import Http
 import Time exposing (Time)
+import Dict exposing (Dict)
+import Json.Decode
 
 requestLimit = 100
 rateLimit = 30
@@ -25,6 +27,7 @@ type alias Model =
   { location : Location
   , login : Maybe String
   , userId : Maybe String
+  , clips : Dict String (List Clip)
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -45,6 +48,7 @@ init location =
   ( { location = location
     , login = mlogin
     , userId = muserId
+    , clips = Dict.singleton "x" (Json.Decode.decodeString Twitch.Deserialize.clips Twitch.Deserialize.sampleClip |> Result.map (List.map myClip) |> Result.withDefault [])
     , pendingRequests = [
       case muserId of
         Just id -> fetchUserById id
@@ -129,6 +133,12 @@ fetchUserById id =
     , tagger = Response << User
     , url = (fetchUserByIdUrl id)
     }
+
+myClip : Twitch.Deserialize.Clip -> Clip
+myClip clip =
+  { id = clip.id
+  , embedUrl = clip.embedUrl
+  }
 
 extractSearchArgument : String -> Location -> Maybe String
 extractSearchArgument key location =

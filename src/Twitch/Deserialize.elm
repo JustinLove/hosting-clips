@@ -7,18 +7,21 @@ module Twitch.Deserialize exposing
   , Video
   , VideoType(..)
   , Viewable(..)
+  , Clip
   , token
   , users
   , liveStreams
   , games
   , follows
   , videos
+  , clips
   , sampleToken
   , sampleUser
   , sampleLiveStream
   , sampleGame
   , sampleFollow
   , sampleVideo
+  , sampleClip
   )
 
 import Twitch.Parse as Parse
@@ -287,6 +290,62 @@ videoType =
       "highlight" -> Highlight
       _ -> Other s
     )
+
+
+sampleClip = """
+{
+  "data":
+  [{
+    "id": "AwkwardHelplessSalamanderSwiftRage",
+    "url": "https://clips.twitch.tv/AwkwardHelplessSalamanderSwiftRage",
+    "embed_url": "https://clips.twitch.tv/embed?clip=AwkwardHelplessSalamanderSwiftRage",
+    "broadcaster_id": "67955580",
+    "creator_id": "53834192",
+    "video_id": "205586603",
+    "game_id": "488191",
+    "language": "en",
+    "title": "babymetal",
+    "view_count": 10,
+    "created_at": "2017-11-30T22:34:18Z",
+    "thumbnail_url": "https://clips-media-assets.twitch.tv/157589949-preview-480x272.jpg"
+  }]
+}
+"""
+
+type alias Clip =
+  { id : String
+  , url : String
+  , embedUrl : String
+  , broadcasterId : String
+  , creatorId : String
+  , videoId : String
+  , gameId : String
+  , language : String
+  , title : String
+  , viewCount : Int
+  , createdAt : Time
+  , thumbnailUrl : String
+  }
+
+clips : Decoder (List Clip)
+clips =
+  field "data" (list clip)
+
+clip : Decoder Clip
+clip =
+  succeed Clip
+    |> map2 (|>) (field "id" string)
+    |> map2 (|>) (field "url" string)
+    |> map2 (|>) (field "embed_url" string)
+    |> map2 (|>) (field "broadcaster_id" string)
+    |> map2 (|>) (field "creator_id" string)
+    |> map2 (|>) (field "video_id" string)
+    |> map2 (|>) (field "game_id" string)
+    |> map2 (|>) (field "language" string)
+    |> map2 (|>) (field "title" string)
+    |> map2 (|>) (field "view_count" int)
+    |> map2 (|>) (field "created_at" timeStamp)
+    |> map2 (|>) (field "thumbnail_url" string)
 
 duration : Decoder Time
 duration =
