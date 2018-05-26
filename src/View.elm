@@ -22,6 +22,19 @@ body {
 
 view model = 
   div []
-    [ text "view"
-    , text <| toString model.clips
+    [ case model.displayedBroadcaster of
+        Just name -> text ("Thanks " ++ name ++ " for the host")
+        Nothing -> text ""
+    , case model.displayedClip of
+      Just clip ->
+        iframe
+          [ src clip.embedUrl
+          , sandbox "allow-scripts allow-same-origin"
+          , attribute "allow" "autoplay"
+          , attribute "width" "100%"
+          , attribute "height" "500"
+          , attribute "scrolling" "no"
+          , attribute "frameborder" "0"
+          ] []
+      Nothing -> text ""
     ]

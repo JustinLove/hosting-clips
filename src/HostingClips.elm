@@ -28,6 +28,8 @@ type alias Model =
   , login : Maybe String
   , userId : Maybe String
   , clips : Dict String (List Clip)
+  , displayedBroadcaster : Maybe String
+  , displayedClip : Maybe Clip
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -44,11 +46,14 @@ init location =
   let
     mlogin = Debug.log "Login" <| extractSearchArgument "login" location
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
+    clips = Json.Decode.decodeString Twitch.Deserialize.clips Twitch.Deserialize.sampleClip |> Result.map (List.map myClip) |> Result.withDefault []
   in
   ( { location = location
     , login = mlogin
     , userId = muserId
-    , clips = Dict.singleton "x" (Json.Decode.decodeString Twitch.Deserialize.clips Twitch.Deserialize.sampleClip |> Result.map (List.map myClip) |> Result.withDefault [])
+    , clips = Dict.singleton "x" clips
+    , displayedBroadcaster = Just "x"
+    , displayedClip = List.head clips
     , pendingRequests = [
       case muserId of
         Just id -> fetchUserById id
