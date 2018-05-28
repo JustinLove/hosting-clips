@@ -58,9 +58,8 @@ init location =
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
     mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
     mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
-    rhosts = Json.Decode.decodeString Tmi.hosts Tmi.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
   in
-  update (Hosts rhosts)
+  update (NextRequest 0)
     { location = location
     , login = mlogin
     , userId = muserId
@@ -75,11 +74,14 @@ init location =
     , clips = Array.empty
     , thanks = NoHosts
     , pendingRequests =
-      [ case mlogin of
-          Just login -> fetchUserByName login
-          Nothing -> Cmd.none
+      [ case muserId of
+          Just id -> fetchHosts id
+          Nothing ->
+            case mlogin of
+              Just login -> fetchUserByName login
+              Nothing -> Cmd.none
       ] |> List.filter (\c -> c /= Cmd.none)
-    , outstandingRequests = 1
+    , outstandingRequests = 0
     }
 
 update msg model =
@@ -88,13 +90,14 @@ update msg model =
       ( { model
         | login = Just user.login
         , userId = Just user.id
-        , pendingRequests = List.append model.pendingRequests
-          []
         }
-      , if (Just user.id) /= model.userId then
-          Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
-        else
-          Cmd.none
+      , Cmd.batch
+        [ if (Just user.id) /= model.userId then
+            Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
+          else
+            Cmd.none
+        , fetchHosts user.id
+        ]
       )
     User (Ok _) ->
       let _ = Debug.log "user did not find that login name" "" in
@@ -221,6 +224,35 @@ fetchClips id =
     , decoder = Helix.clips
     , tagger = Response << Clips id
     , url = (fetchClipsUrl id)
+    }
+
+fetchHostsUrl : String -> String
+fetchHostsUrl id =
+  "http://tmi.twitch.tv/hosts?include_logins=1&target=" ++ id
+
+corsWorkaround : String -> String
+corsWorkaround url =
+  "https://cors-proxy.htmldriven.com/?url=" ++ (Http.encodeUri url)
+
+corsUnwrap : Json.Decode.Decoder a -> Json.Decode.Decoder a
+corsUnwrap decoder =
+  Json.Decode.field "body" Json.Decode.string
+    |> Json.Decode.andThen (\body ->
+      case Json.Decode.decodeString decoder body of
+        Ok a -> Json.Decode.succeed a
+        Err err -> Json.Decode.fail err
+      )
+
+fetchHosts : String -> Cmd Msg
+fetchHosts id =
+  Http.send (Response << Hosts) <| Http.request
+    { method = "GET"
+    , headers = []
+    , url = corsWorkaround (fetchHostsUrl id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson (corsUnwrap Tmi.hosts)
+    , timeout = Nothing
+    , withCredentials = False
     }
 
 myClip : Helix.Clip -> Clip
