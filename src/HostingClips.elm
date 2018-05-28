@@ -18,7 +18,8 @@ import Random
 requestLimit = 100
 rateLimit = 30
 requestRate = 60*Time.second/rateLimit
-cycleTime = 60*Time.second
+clipCycleTime = 60*Time.second
+noClipCycleTime = 10*Time.second
 
 type Msg
   = User (Result Http.Error (List Helix.User))
@@ -177,7 +178,10 @@ subscriptions model =
     , if Array.isEmpty model.clips then
         Sub.none
       else
-        Time.every cycleTime NextChoice
+        case model.thanks of
+          ThanksClip _ _ -> Time.every clipCycleTime NextChoice
+          Thanks _ -> Time.every noClipCycleTime NextChoice
+          NoHosts -> Time.every clipCycleTime NextChoice
     ]
 
 maybePickCommand : Array a -> Array a -> Cmd Msg
