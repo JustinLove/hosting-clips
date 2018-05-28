@@ -18,6 +18,7 @@ requestRate = 60*Time.second/rateLimit
 
 type Msg
   = User (Result Http.Error (List Twitch.Deserialize.User))
+  | Hosts (Result Http.Error (List Twitch.Deserialize.Host))
   | Clips (Result Http.Error (List Twitch.Deserialize.Clip))
   | Response Msg
   | NextRequest Time
@@ -29,6 +30,7 @@ type alias Model =
   , login : Maybe String
   , userId : Maybe String
   , showClip : Bool
+  , hostLimit : Int
   , hosts : List Host
   , clips : Dict String (List Clip)
   , displayedBroadcaster : Maybe String
@@ -50,15 +52,21 @@ init location =
     mlogin = Debug.log "Login" <| extractSearchArgument "login" location
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
     mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
-    hosts = [Host "56623426" "wondible"]
+    mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
+    rhosts = Json.Decode.decodeString Twitch.Deserialize.hosts Twitch.Deserialize.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
   in
-  ( { location = location
+  update (Hosts rhosts)
+    { location = location
     , login = mlogin
     , userId = muserId
     , showClip = case Maybe.withDefault "true" mshowClip of
         "false" -> False
         _ -> True
-    , hosts = hosts
+    , hostLimit = mhostLimit
+      |> Maybe.map String.toInt
+      |> Maybe.withDefault (Err "unspecified")
+      |> Result.withDefault requestLimit
+    , hosts = []
     , clips = Dict.empty
     , displayedBroadcaster = Just "x"
     , displayedClip = Nothing
@@ -69,14 +77,9 @@ init location =
             case mlogin of
               Just login -> fetchUserByName login
               Nothing -> Cmd.none
-      , case List.head hosts of
-        Just {hostId,hostDisplayName} -> fetchClips hostId
-        Nothing -> Cmd.none
       ]
     , outstandingRequests = 1
     }
-  , Cmd.none
-  )
 
 update msg model =
   case msg of
@@ -101,7 +104,7 @@ update msg model =
     Clips (Ok twitchClips) ->
       let clips = List.map myClip twitchClips in
       ( { model
-        | clips = groupBy .broadcasterId clips
+        | clips = Dict.union (groupBy .broadcasterId clips) model.clips
         , displayedClip = List.head clips
         , pendingRequests = List.append model.pendingRequests
           []
@@ -110,6 +113,22 @@ update msg model =
       )
     Clips (Err error) ->
       let _ = Debug.log "clip fetch error" error in
+      (model, Cmd.none)
+    Hosts (Ok twitchHosts) ->
+      let
+        hosts = List.map myHost twitchHosts
+        requests = hosts
+          |> List.take model.hostLimit
+          |> List.map (\{hostId} -> fetchClips hostId)
+      in
+      ( { model
+        | hosts = hosts
+        , pendingRequests = List.append model.pendingRequests requests
+        }
+      , Cmd.none
+      )
+    Hosts (Err error) ->
+      let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
@@ -182,6 +201,12 @@ myClip clip =
   { id = clip.id
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
+  }
+
+myHost : Twitch.Deserialize.Host -> Host
+myHost host =
+  { hostId = host.hostId
+  , hostDisplayName = host.hostDisplayName
   }
 
 extractSearchArgument : String -> Location -> Maybe String
