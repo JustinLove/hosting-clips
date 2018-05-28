@@ -1,4 +1,4 @@
-module Twitch.Deserialize exposing
+module Twitch.Helix.Decode exposing
   ( Token
   , User
   , LiveStream

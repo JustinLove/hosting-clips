@@ -1,7 +1,7 @@
 module HostingClips exposing (..)
 
-import Twitch.Deserialize
-import Twitch exposing (helix)
+import Twitch.Helix.Decode as Decode
+import Twitch.Helix as Helix
 import TwitchId
 import View exposing (Clip, Host)
 
@@ -17,9 +17,9 @@ rateLimit = 30
 requestRate = 60*Time.second/rateLimit
 
 type Msg
-  = User (Result Http.Error (List Twitch.Deserialize.User))
-  | Hosts (Result Http.Error (List Twitch.Deserialize.Host))
-  | Clips (Result Http.Error (List Twitch.Deserialize.Clip))
+  = User (Result Http.Error (List Decode.User))
+  | Hosts (Result Http.Error (List Decode.Host))
+  | Clips (Result Http.Error (List Decode.Clip))
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
@@ -53,7 +53,7 @@ init location =
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
     mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
     mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
-    rhosts = Json.Decode.decodeString Twitch.Deserialize.hosts Twitch.Deserialize.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
+    rhosts = Json.Decode.decodeString Decode.hosts Decode.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
   in
   update (Hosts rhosts)
     { location = location
@@ -160,10 +160,10 @@ fetchUserByNameUrl login =
 
 fetchUserByName : String -> Cmd Msg
 fetchUserByName login =
-  helix <|
+  Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Twitch.Deserialize.users
+    , decoder = Decode.users
     , tagger = Response << User
     , url = (fetchUserByNameUrl login)
     }
@@ -174,10 +174,10 @@ fetchUserByIdUrl id =
 
 fetchUserById : String -> Cmd Msg
 fetchUserById id =
-  helix <|
+  Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Twitch.Deserialize.users
+    , decoder = Decode.users
     , tagger = Response << User
     , url = (fetchUserByIdUrl id)
     }
@@ -188,22 +188,22 @@ fetchClipsUrl id =
 
 fetchClips : String -> Cmd Msg
 fetchClips id =
-  helix <|
+  Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Twitch.Deserialize.clips
+    , decoder = Decode.clips
     , tagger = Response << Clips
     , url = (fetchClipsUrl id)
     }
 
-myClip : Twitch.Deserialize.Clip -> Clip
+myClip : Decode.Clip -> Clip
 myClip clip =
   { id = clip.id
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
   }
 
-myHost : Twitch.Deserialize.Host -> Host
+myHost : Decode.Host -> Host
 myHost host =
   { hostId = host.hostId
   , hostDisplayName = host.hostDisplayName

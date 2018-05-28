@@ -1,16 +1,16 @@
-module Twitch exposing (helix, twitchHeaders, authHeaders)
+module Twitch.Helix exposing (send, twitchHeaders, authHeaders)
 
 import Http
 import Json.Decode
 
-helix :
+send :
   { clientId : String
   , auth : Maybe String
   , decoder : Json.Decode.Decoder a
   , tagger : ((Result Http.Error a) -> msg)
   , url : String
   } -> Cmd msg
-helix {clientId, auth, decoder, tagger, url} =
+send {clientId, auth, decoder, tagger, url} =
   Http.send tagger <| Http.request
     { method = "GET"
     , headers = twitchHeaders clientId auth
