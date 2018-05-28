@@ -72,13 +72,10 @@ init location =
     , displayedBroadcaster = Just "x"
     , displayedClip = Nothing
     , pendingRequests =
-      [ case muserId of
-          Just id -> fetchUserById id
-          Nothing ->
-            case mlogin of
-              Just login -> fetchUserByName login
-              Nothing -> Cmd.none
-      ]
+      [ case mlogin of
+          Just login -> fetchUserByName login
+          Nothing -> Cmd.none
+      ] |> List.filter (\c -> c /= Cmd.none)
     , outstandingRequests = 1
     }
 
