@@ -28,6 +28,7 @@ type alias Model =
   { location : Location
   , login : Maybe String
   , userId : Maybe String
+  , showClip : Bool
   , hosts : List Host
   , clips : Dict String (List Clip)
   , displayedBroadcaster : Maybe String
@@ -48,11 +49,15 @@ init location =
   let
     mlogin = Debug.log "Login" <| extractSearchArgument "login" location
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
+    mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
     hosts = [Host "56623426" "wondible"]
   in
   ( { location = location
     , login = mlogin
     , userId = muserId
+    , showClip = case Maybe.withDefault "true" mshowClip of
+        "false" -> False
+        _ -> True
     , hosts = hosts
     , clips = Dict.empty
     , displayedBroadcaster = Just "x"
