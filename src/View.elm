@@ -33,7 +33,8 @@ body {
 
 view model = 
   div []
-    [ case model.thanks of
+    [ node "style" [] [ text css ]
+    , case model.thanks of
         ThanksClip name clip ->
           div []
             [ displayName name
