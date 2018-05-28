@@ -11,6 +11,7 @@ type Msg
 type alias Clip =
   { id : String
   , embedUrl : String
+  , broadcasterId : String
   }
 
 css = """

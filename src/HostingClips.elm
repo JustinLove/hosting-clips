@@ -18,6 +18,7 @@ requestRate = 60*Time.second/rateLimit
 
 type Msg
   = User (Result Http.Error (List Twitch.Deserialize.User))
+  | Clips (Result Http.Error (List Twitch.Deserialize.Clip))
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
@@ -46,14 +47,13 @@ init location =
   let
     mlogin = Debug.log "Login" <| extractSearchArgument "login" location
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
-    clips = Json.Decode.decodeString Twitch.Deserialize.clips Twitch.Deserialize.sampleClip |> Result.map (List.map myClip) |> Result.withDefault []
   in
   ( { location = location
     , login = mlogin
     , userId = muserId
-    , clips = Dict.singleton "x" clips
+    , clips = Dict.empty
     , displayedBroadcaster = Just "x"
-    , displayedClip = List.head clips
+    , displayedClip = Nothing
     , pendingRequests = [
       case muserId of
         Just id -> fetchUserById id
@@ -74,7 +74,7 @@ update msg model =
         | login = Just user.login
         , userId = Just user.id
         , pendingRequests = List.append model.pendingRequests
-          []
+          [fetchClips user.id]
         }
       , if (Just user.id) /= model.userId then
           Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
@@ -86,6 +86,19 @@ update msg model =
       (model, Cmd.none)
     User (Err error) ->
       let _ = Debug.log "user fetch error" error in
+      (model, Cmd.none)
+    Clips (Ok twitchClips) ->
+      let clips = List.map myClip twitchClips in
+      ( { model
+        | clips = groupBy .broadcasterId clips
+        , displayedClip = List.head clips
+        , pendingRequests = List.append model.pendingRequests
+          []
+        }
+      , Cmd.none
+      )
+    Clips (Err error) ->
+      let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
@@ -139,10 +152,25 @@ fetchUserById id =
     , url = (fetchUserByIdUrl id)
     }
 
+fetchClipsUrl : String -> String
+fetchClipsUrl id =
+  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id
+
+fetchClips : String -> Cmd Msg
+fetchClips id =
+  helix <|
+    { clientId = TwitchId.clientId
+    , auth = Nothing
+    , decoder = Twitch.Deserialize.clips
+    , tagger = Response << Clips
+    , url = (fetchClipsUrl id)
+    }
+
 myClip : Twitch.Deserialize.Clip -> Clip
 myClip clip =
   { id = clip.id
   , embedUrl = clip.embedUrl
+  , broadcasterId = clip.broadcasterId
   }
 
 extractSearchArgument : String -> Location -> Maybe String
@@ -159,3 +187,9 @@ extractSearchArgument key location =
     |> List.head
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
+
+groupBy : (a -> comparable) -> List a -> Dict comparable (List a)
+groupBy attr list =
+  List.foldl (\x dict ->
+      Dict.update (attr x) (Maybe.withDefault [] >> (::) x >> Just) dict
+    ) Dict.empty list
