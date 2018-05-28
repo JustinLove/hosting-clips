@@ -4,7 +4,7 @@ import Twitch.Helix.Decode as Helix
 import Twitch.Tmi.Decode as Tmi
 import Twitch.Helix as Helix
 import TwitchId
-import View exposing (Clip, Host)
+import View exposing (Choice(..), Clip, Host)
 
 import Html
 import Navigation exposing (Location)
@@ -36,9 +36,8 @@ type alias Model =
   , showClip : Bool
   , hostLimit : Int
   , hosts : List Host
-  , clips : Array Clip
-  , displayedBroadcaster : Maybe String
-  , displayedClip : Maybe Clip
+  , clips : Array Choice
+  , thanks : Choice
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -72,8 +71,7 @@ init location =
       |> Result.withDefault requestLimit
     , hosts = []
     , clips = Array.empty
-    , displayedBroadcaster = Nothing
-    , displayedClip = Nothing
+    , thanks = NoHosts
     , pendingRequests =
       [ case mlogin of
           Just login -> fetchUserByName login
@@ -120,7 +118,11 @@ update msg model =
       (model, Cmd.none)
     Clips (Ok twitchClips) ->
       let
-        new = List.map myClip twitchClips
+        new = twitchClips
+          |> List.map myClip
+          |> List.map (\clip ->
+              ThanksClip (displayNameForClip model.hosts clip) clip
+          )
         clips = Array.append model.clips (Array.fromList new)
       in
       ( { model
@@ -132,16 +134,9 @@ update msg model =
       let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
     Pick index ->
-      let
-        clip = Array.get index model.clips
-      in
       ( { model
-        | displayedClip = clip
-        , displayedBroadcaster = clip
-          |> Maybe.map .broadcasterId
-          |> Maybe.map (\id -> List.filter (\host -> host.hostId == id) model.hosts)
-          |> Maybe.andThen List.head
-          |> Maybe.map .hostDisplayName
+        | thanks = Array.get index model.clips
+          |> Maybe.withDefault NoHosts
         }
       , Cmd.none
       )
@@ -223,6 +218,14 @@ myHost host =
   { hostId = host.hostId
   , hostDisplayName = host.hostDisplayName
   }
+
+displayNameForClip : List Host -> Clip -> String
+displayNameForClip hosts clip =
+  hosts
+    |> List.filter (\host -> host.hostId == clip.broadcasterId)
+    |> List.head
+    |> Maybe.map .hostDisplayName
+    |> Maybe.withDefault "Oops, how did that happen?"
 
 extractSearchArgument : String -> Location -> Maybe String
 extractSearchArgument key location =

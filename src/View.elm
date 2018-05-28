@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Clip, Host, view)
+module View exposing (Msg(..), Choice(..), Clip, Host, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -7,6 +7,11 @@ import Time exposing (Time)
 
 type Msg
   = None
+
+type Choice
+  = ThanksClip String Clip
+  | Thanks String
+  | NoHosts
 
 type alias Clip =
   { id : String
@@ -28,24 +33,36 @@ body {
 
 view model = 
   div []
-    [ case model.displayedBroadcaster of
-        Just name -> text ("Thanks " ++ name ++ " for the host")
-        Nothing -> text ""
-    , div []
-      [ case model.displayedClip of
-          Just clip ->
-            if model.showClip then
-              iframe
-                [ src clip.embedUrl
-                , sandbox "allow-scripts allow-same-origin"
-                , attribute "allow" "autoplay"
-                , attribute "width" "100%"
-                , attribute "height" "500"
-                , attribute "scrolling" "no"
-                , attribute "frameborder" "0"
-                ] []
-            else
-              text clip.embedUrl
-          Nothing -> text ""
-      ]
+    [ case model.thanks of
+        ThanksClip name clip ->
+          div []
+            [ displayName name
+            , if model.showClip then
+                displayClip clip
+              else
+                text clip.embedUrl
+            ]
+        Thanks name ->
+          div []
+            [ displayName name
+            ]
+        NoHosts -> text ""
     ]
+
+displayName : String -> Html msg
+displayName name =
+  h1 []
+    [ text ("Thanks " ++ name ++ " for the host")
+    ]
+
+displayClip : Clip -> Html msg
+displayClip clip =
+  iframe
+    [ src clip.embedUrl
+    , sandbox "allow-scripts allow-same-origin"
+    , attribute "allow" "autoplay"
+    , attribute "width" "100%"
+    , attribute "height" "500"
+    , attribute "scrolling" "no"
+    , attribute "frameborder" "0"
+    ] []
