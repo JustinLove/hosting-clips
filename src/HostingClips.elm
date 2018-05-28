@@ -13,6 +13,7 @@ import Time exposing (Time)
 import Dict exposing (Dict)
 import Json.Decode
 import Array exposing (Array)
+import Random
 
 requestLimit = 100
 rateLimit = 30
@@ -22,6 +23,7 @@ type Msg
   = User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips (Result Http.Error (List Helix.Clip))
+  | Pick Int
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
@@ -100,17 +102,6 @@ update msg model =
     User (Err error) ->
       let _ = Debug.log "user fetch error" error in
       (model, Cmd.none)
-    Clips (Ok twitchClips) ->
-      let clips = List.map myClip twitchClips in
-      ( { model
-        | clips = Array.append model.clips (Array.fromList clips)
-        , displayedClip = List.head clips
-        }
-      , Cmd.none
-      )
-    Clips (Err error) ->
-      let _ = Debug.log "clip fetch error" error in
-      (model, Cmd.none)
     Hosts (Ok twitchHosts) ->
       let
         hosts = List.map myHost twitchHosts
@@ -127,6 +118,25 @@ update msg model =
     Hosts (Err error) ->
       let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
+    Clips (Ok twitchClips) ->
+      let
+        new = List.map myClip twitchClips
+        clips = Array.append model.clips (Array.fromList new)
+      in
+      ( { model
+        | clips = clips
+        }
+      , Random.generate Pick (Random.int 0 (Array.length clips))
+      )
+    Clips (Err error) ->
+      let _ = Debug.log "clip fetch error" error in
+      (model, Cmd.none)
+    Pick index ->
+      ( { model
+        | displayedClip = Array.get index model.clips
+        }
+      , Cmd.none
+      )
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
     NextRequest _ ->
