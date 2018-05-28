@@ -126,7 +126,7 @@ update msg model =
         clips = Array.push (Thanks (displayNameForHost model.hosts id)) model.clips
       in
       ( { model | clips = clips }
-      , pickCommand clips
+      , maybePickCommand model.clips clips
       )
     Clips id (Ok twitchClips) ->
       let
@@ -138,7 +138,7 @@ update msg model =
         clips = Array.append model.clips (Array.fromList new)
       in
       ( { model | clips = clips }
-      , pickCommand clips
+      , maybePickCommand model.clips clips
       )
     Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
@@ -179,6 +179,13 @@ subscriptions model =
       else
         Time.every cycleTime NextChoice
     ]
+
+maybePickCommand : Array a -> Array a -> Cmd Msg
+maybePickCommand before after =
+  if Array.isEmpty before then
+    pickCommand after
+  else
+    Cmd.none
 
 pickCommand : Array a -> Cmd Msg
 pickCommand clips = 
