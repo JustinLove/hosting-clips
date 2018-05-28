@@ -3,7 +3,7 @@ module HostingClips exposing (..)
 import Twitch.Deserialize
 import Twitch exposing (helix)
 import TwitchId
-import View exposing (Clip)
+import View exposing (Clip, Host)
 
 import Html
 import Navigation exposing (Location)
@@ -28,6 +28,7 @@ type alias Model =
   { location : Location
   , login : Maybe String
   , userId : Maybe String
+  , hosts : List Host
   , clips : Dict String (List Clip)
   , displayedBroadcaster : Maybe String
   , displayedClip : Maybe Clip
@@ -47,20 +48,25 @@ init location =
   let
     mlogin = Debug.log "Login" <| extractSearchArgument "login" location
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
+    hosts = [Host "56623426" "wondible"]
   in
   ( { location = location
     , login = mlogin
     , userId = muserId
+    , hosts = hosts
     , clips = Dict.empty
     , displayedBroadcaster = Just "x"
     , displayedClip = Nothing
-    , pendingRequests = [
-      case muserId of
-        Just id -> fetchUserById id
-        Nothing ->
-          case mlogin of
-            Just login -> fetchUserByName login
-            Nothing -> Cmd.none
+    , pendingRequests =
+      [ case muserId of
+          Just id -> fetchUserById id
+          Nothing ->
+            case mlogin of
+              Just login -> fetchUserByName login
+              Nothing -> Cmd.none
+      , case List.head hosts of
+        Just {hostId,hostDisplayName} -> fetchClips hostId
+        Nothing -> Cmd.none
       ]
     , outstandingRequests = 1
     }
@@ -74,7 +80,7 @@ update msg model =
         | login = Just user.login
         , userId = Just user.id
         , pendingRequests = List.append model.pendingRequests
-          [fetchClips user.id]
+          []
         }
       , if (Just user.id) /= model.userId then
           Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)

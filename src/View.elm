@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Clip, view)
+module View exposing (Msg(..), Clip, Host, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -12,6 +12,11 @@ type alias Clip =
   { id : String
   , embedUrl : String
   , broadcasterId : String
+  }
+
+type alias Host =
+  { hostId : String
+  , hostDisplayName : String
   }
 
 css = """
