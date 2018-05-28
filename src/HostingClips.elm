@@ -72,7 +72,7 @@ init location =
       |> Result.withDefault requestLimit
     , hosts = []
     , clips = Array.empty
-    , displayedBroadcaster = Just "x"
+    , displayedBroadcaster = Nothing
     , displayedClip = Nothing
     , pendingRequests =
       [ case mlogin of
@@ -132,8 +132,16 @@ update msg model =
       let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
     Pick index ->
+      let
+        clip = Array.get index model.clips
+      in
       ( { model
-        | displayedClip = Array.get index model.clips
+        | displayedClip = clip
+        , displayedBroadcaster = clip
+          |> Maybe.map .broadcasterId
+          |> Maybe.map (\id -> List.filter (\host -> host.hostId == id) model.hosts)
+          |> Maybe.andThen List.head
+          |> Maybe.map .hostDisplayName
         }
       , Cmd.none
       )
