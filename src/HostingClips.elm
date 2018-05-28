@@ -179,7 +179,7 @@ subscriptions model =
 
 pickCommand : Array a -> Cmd Msg
 pickCommand clips = 
-  Random.generate Pick (Random.int 0 (Array.length clips))
+  Random.generate Pick (Random.int 0 ((Array.length clips) - 1))
 
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
