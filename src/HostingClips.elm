@@ -18,12 +18,14 @@ import Random
 requestLimit = 100
 rateLimit = 30
 requestRate = 60*Time.second/rateLimit
+cycleTime = 60*Time.second
 
 type Msg
   = User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips String (Result Http.Error (List Helix.Clip))
   | Pick Int
+  | NextChoice Time
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
@@ -121,7 +123,7 @@ update msg model =
         clips = Array.push (Thanks (displayNameForHost model.hosts id)) model.clips
       in
       ( { model | clips = clips }
-      , Random.generate Pick (Random.int 0 (Array.length clips))
+      , pickCommand clips
       )
     Clips id (Ok twitchClips) ->
       let
@@ -133,7 +135,7 @@ update msg model =
         clips = Array.append model.clips (Array.fromList new)
       in
       ( { model | clips = clips }
-      , Random.generate Pick (Random.int 0 (Array.length clips))
+      , pickCommand clips
       )
     Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
@@ -145,6 +147,8 @@ update msg model =
         }
       , Cmd.none
       )
+    NextChoice time ->
+      ( model, pickCommand model.clips )
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
     NextRequest _ ->
@@ -167,7 +171,15 @@ subscriptions model =
         Sub.none
       else
         Time.every (requestRate*1.05) NextRequest
+    , if Array.isEmpty model.clips then
+        Sub.none
+      else
+        Time.every cycleTime NextChoice
     ]
+
+pickCommand : Array a -> Cmd Msg
+pickCommand clips = 
+  Random.generate Pick (Random.int 0 (Array.length clips))
 
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
