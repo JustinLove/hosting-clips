@@ -22,7 +22,7 @@ requestRate = 60*Time.second/rateLimit
 type Msg
   = User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
-  | Clips (Result Http.Error (List Helix.Clip))
+  | Clips String (Result Http.Error (List Helix.Clip))
   | Pick Int
   | Response Msg
   | NextRequest Time
@@ -116,21 +116,26 @@ update msg model =
     Hosts (Err error) ->
       let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
-    Clips (Ok twitchClips) ->
+    Clips id (Ok []) ->
+      let
+        clips = Array.push (Thanks (displayNameForHost model.hosts id)) model.clips
+      in
+      ( { model | clips = clips }
+      , Random.generate Pick (Random.int 0 (Array.length clips))
+      )
+    Clips id (Ok twitchClips) ->
       let
         new = twitchClips
           |> List.map myClip
           |> List.map (\clip ->
-              ThanksClip (displayNameForClip model.hosts clip) clip
+              ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
           )
         clips = Array.append model.clips (Array.fromList new)
       in
-      ( { model
-        | clips = clips
-        }
+      ( { model | clips = clips }
       , Random.generate Pick (Random.int 0 (Array.length clips))
       )
-    Clips (Err error) ->
+    Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
     Pick index ->
@@ -202,7 +207,7 @@ fetchClips id =
     { clientId = TwitchId.clientId
     , auth = Nothing
     , decoder = Helix.clips
-    , tagger = Response << Clips
+    , tagger = Response << Clips id
     , url = (fetchClipsUrl id)
     }
 
@@ -219,10 +224,10 @@ myHost host =
   , hostDisplayName = host.hostDisplayName
   }
 
-displayNameForClip : List Host -> Clip -> String
-displayNameForClip hosts clip =
+displayNameForHost : List Host -> String -> String
+displayNameForHost hosts id =
   hosts
-    |> List.filter (\host -> host.hostId == clip.broadcasterId)
+    |> List.filter (\host -> host.hostId == id)
     |> List.head
     |> Maybe.map .hostDisplayName
     |> Maybe.withDefault "Oops, how did that happen?"
