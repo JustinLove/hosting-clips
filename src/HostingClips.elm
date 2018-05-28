@@ -12,6 +12,7 @@ import Http
 import Time exposing (Time)
 import Dict exposing (Dict)
 import Json.Decode
+import Array exposing (Array)
 
 requestLimit = 100
 rateLimit = 30
@@ -33,7 +34,7 @@ type alias Model =
   , showClip : Bool
   , hostLimit : Int
   , hosts : List Host
-  , clips : Dict String (List Clip)
+  , clips : Array Clip
   , displayedBroadcaster : Maybe String
   , displayedClip : Maybe Clip
   , pendingRequests : List (Cmd Msg)
@@ -68,7 +69,7 @@ init location =
       |> Maybe.withDefault (Err "unspecified")
       |> Result.withDefault requestLimit
     , hosts = []
-    , clips = Dict.empty
+    , clips = Array.empty
     , displayedBroadcaster = Just "x"
     , displayedClip = Nothing
     , pendingRequests =
@@ -102,10 +103,8 @@ update msg model =
     Clips (Ok twitchClips) ->
       let clips = List.map myClip twitchClips in
       ( { model
-        | clips = Dict.union (groupBy .broadcasterId clips) model.clips
+        | clips = Array.append model.clips (Array.fromList clips)
         , displayedClip = List.head clips
-        , pendingRequests = List.append model.pendingRequests
-          []
         }
       , Cmd.none
       )
@@ -221,9 +220,3 @@ extractSearchArgument key location =
     |> List.head
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
-
-groupBy : (a -> comparable) -> List a -> Dict comparable (List a)
-groupBy attr list =
-  List.foldl (\x dict ->
-      Dict.update (attr x) (Maybe.withDefault [] >> (::) x >> Just) dict
-    ) Dict.empty list
