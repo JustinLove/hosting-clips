@@ -75,7 +75,7 @@ displayClip clip =
     , sandbox "allow-scripts allow-same-origin"
     , attribute "allow" "autoplay"
     , attribute "width" "100%"
-    , attribute "height" "500"
+    , attribute "height" "600"
     , attribute "scrolling" "no"
     , attribute "frameborder" "0"
     ] []
