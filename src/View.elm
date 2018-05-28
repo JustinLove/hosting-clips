@@ -29,6 +29,16 @@ body {
   background-color: rgb(23, 20, 31);
   color: rgb(218, 216, 222);
 }
+h1 {
+  background-color: #2c2541;
+  color: rgb(250, 249, 250);
+  margin: 0;
+  padding: 0.5em;
+  text-align: center;
+}
+.channel-name {
+  color: rgb(218, 216, 222);
+}
 """
 
 view model = 
@@ -53,7 +63,9 @@ view model =
 displayName : String -> Html msg
 displayName name =
   h1 []
-    [ text ("Thanks " ++ name ++ " for the host")
+    [ text "Thanks "
+    , span [ class "channel-name" ] [ text name ]
+    , text " for the host"
     ]
 
 displayClip : Clip -> Html msg
