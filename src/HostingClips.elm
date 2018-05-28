@@ -1,6 +1,7 @@
 module HostingClips exposing (..)
 
-import Twitch.Helix.Decode as Decode
+import Twitch.Helix.Decode as Helix
+import Twitch.Tmi.Decode as Tmi
 import Twitch.Helix as Helix
 import TwitchId
 import View exposing (Clip, Host)
@@ -17,9 +18,9 @@ rateLimit = 30
 requestRate = 60*Time.second/rateLimit
 
 type Msg
-  = User (Result Http.Error (List Decode.User))
-  | Hosts (Result Http.Error (List Decode.Host))
-  | Clips (Result Http.Error (List Decode.Clip))
+  = User (Result Http.Error (List Helix.User))
+  | Hosts (Result Http.Error (List Tmi.Host))
+  | Clips (Result Http.Error (List Helix.Clip))
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
@@ -53,7 +54,7 @@ init location =
     muserId = Debug.log "userId" <| extractSearchArgument "userId" location
     mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
     mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
-    rhosts = Json.Decode.decodeString Decode.hosts Decode.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
+    rhosts = Json.Decode.decodeString Tmi.hosts Tmi.sampleHost |> Result.mapError (\err -> Http.BadPayload err {url = "", status = {code = 200, message = ""}, headers = Dict.empty, body = ""})
   in
   update (Hosts rhosts)
     { location = location
@@ -163,7 +164,7 @@ fetchUserByName login =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Decode.users
+    , decoder = Helix.users
     , tagger = Response << User
     , url = (fetchUserByNameUrl login)
     }
@@ -177,7 +178,7 @@ fetchUserById id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Decode.users
+    , decoder = Helix.users
     , tagger = Response << User
     , url = (fetchUserByIdUrl id)
     }
@@ -191,19 +192,19 @@ fetchClips id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
-    , decoder = Decode.clips
+    , decoder = Helix.clips
     , tagger = Response << Clips
     , url = (fetchClipsUrl id)
     }
 
-myClip : Decode.Clip -> Clip
+myClip : Helix.Clip -> Clip
 myClip clip =
   { id = clip.id
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
   }
 
-myHost : Decode.Host -> Host
+myHost : Tmi.Host -> Host
 myHost host =
   { hostId = host.hostId
   , hostDisplayName = host.hostDisplayName

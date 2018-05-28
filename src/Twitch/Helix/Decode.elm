@@ -8,7 +8,6 @@ module Twitch.Helix.Decode exposing
   , VideoType(..)
   , Viewable(..)
   , Clip
-  , Host
   , token
   , users
   , liveStreams
@@ -16,7 +15,6 @@ module Twitch.Helix.Decode exposing
   , follows
   , videos
   , clips
-  , hosts
   , sampleToken
   , sampleUser
   , sampleLiveStream
@@ -24,7 +22,6 @@ module Twitch.Helix.Decode exposing
   , sampleFollow
   , sampleVideo
   , sampleClip
-  , sampleHost
   )
 
 import Twitch.Parse as Parse
