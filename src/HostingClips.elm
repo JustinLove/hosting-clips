@@ -75,13 +75,14 @@ init location =
     , clips = Array.empty
     , thanks = NoHosts
     , pendingRequests =
-      [ case muserId of
-          Just id -> fetchHosts id
+      (case muserId of
+          Just id -> [ fetchHosts id, fetchUserById id ]
           Nothing ->
             case mlogin of
-              Just login -> fetchUserByName login
-              Nothing -> Cmd.none
-      ] |> List.filter (\c -> c /= Cmd.none)
+              Just login -> [ fetchUserByName login ]
+              Nothing -> [ Cmd.none ]
+      )
+      |> List.filter (\c -> c /= Cmd.none)
     , outstandingRequests = 0
     }
 
@@ -92,13 +93,13 @@ update msg model =
         | login = Just user.login
         , userId = Just user.id
         }
-      , Cmd.batch
-        [ if (Just user.id) /= model.userId then
-            Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
-          else
-            Cmd.none
-        , fetchHosts user.id
-        ]
+      , if (Just user.id) /= model.userId then
+          Cmd.batch
+            [ Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
+            , fetchHosts user.id
+            ]
+        else
+          Cmd.none
       )
     User (Ok _) ->
       let _ = Debug.log "user did not find that login name" "" in
