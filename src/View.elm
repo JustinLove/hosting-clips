@@ -89,7 +89,7 @@ view model =
           div [ class "host clip" ]
             [ displayName name
             , if model.showClip then
-                displayClip model.windowWidth (model.windowHeight - 100) clip
+                displayClip model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
             ]
@@ -121,10 +121,16 @@ displayClip width height clip =
     [ src clip.embedUrl
     , sandbox "allow-scripts allow-same-origin"
     , attribute "allow" "autoplay"
-    , attribute "width" (toString width)
-    , attribute "height" (toString height)
+    , attribute "width" (toString ((toFloat width) * 0.8))
+    , attribute "height" (toString ((toFloat height) * 0.8))
     , attribute "scrolling" "no"
     , attribute "frameborder" "0"
+    , style
+      [ ("padding",
+          (toString ((toFloat height) * 0.1)) ++ "px " ++
+          (toString ((toFloat width) * 0.1)) ++ "px"
+        )
+      ]
     ] []
 
 displayFooter : Html msg
