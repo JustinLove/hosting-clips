@@ -99,13 +99,16 @@ init location =
 update msg model =
   case msg of
     User (Ok (user::_)) ->
-      ( { model
+      let m2 =
+        { model
         | login = Just user.login
         , userId = Just user.id
         }
+      in
+      ( m2
       , if (Just user.id) /= model.userId then
           Cmd.batch
-            [ Navigation.modifyUrl (model.location.pathname ++ "?userId="  ++ user.id)
+            [ Navigation.modifyUrl (createPath m2)
             , fetchHosts user.id
             ]
         else
@@ -380,3 +383,26 @@ extractSearchArgument key location =
     |> List.head
     |> Maybe.andThen List.tail
     |> Maybe.andThen List.head
+
+createQueryString : Model -> String
+createQueryString model =
+  String.join "&"
+    [ (case model.userId of
+        Just id -> "userId=" ++ id
+        Nothing -> (case model.login of
+          Just name -> "login=" ++ name
+          Nothing -> "")
+      )
+    , if model.showClip == False then
+        "showClip=false"
+      else 
+        ""
+    , if model.hostLimit < requestLimit then
+        "hostLimit=" ++ (toString model.hostLimit)
+      else
+        ""
+    ]
+
+createPath : Model -> String
+createPath model =
+  model.location.pathname ++ "?" ++ (createQueryString model)
