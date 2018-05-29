@@ -3,7 +3,8 @@ module View exposing (Msg(..), Choice(..), Clip, Host, view)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on)
-import Time exposing (Time)
+import Svg exposing (svg, use)
+import Svg.Attributes exposing (xlinkHref)
 
 type Msg
   = None
@@ -25,6 +26,10 @@ type alias Host =
   }
 
 css = """
+html, head, body {
+  height: 100%;
+  margin: 0;
+}
 body {
   background-color: rgb(23, 20, 31);
   color: rgb(218, 216, 222);
@@ -55,6 +60,24 @@ body {
 .no-hosts .host-command {
   text-align: center;
 }
+footer {
+  position: fixed;
+  bottom: 0;
+}
+svg.icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.2em;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+.icon-github { color: #888; }
+.icon-twitter { color: #55acee; }
+.icon-twitch { color: #6441A4; }
+a:link, a:visited { color: #b19dd8; }
+a:hover, a:active { color: rgb(218, 216, 222); }
 """
 
 view model = 
@@ -65,7 +88,7 @@ view model =
           div [ class "host clip" ]
             [ displayName name
             , if model.showClip then
-                displayClip model.windowWidth (model.windowHeight - 50) clip
+                displayClip model.windowWidth (model.windowHeight - 100) clip
               else
                 text clip.embedUrl
             ]
@@ -80,6 +103,7 @@ view model =
               Just name -> h2 [ class "host-command" ] [ text ("/host " ++ name) ]
               Nothing -> text ""
             ]
+    , displayFooter
     ]
 
 displayName : String -> Html msg
@@ -101,3 +125,21 @@ displayClip width height clip =
     , attribute "scrolling" "no"
     , attribute "frameborder" "0"
     ] []
+
+displayFooter : Html msg
+displayFooter =
+  footer []
+  [ a [ href "https://github.com/JustinLove/hosting-clips" ]
+    [ icon "github", text "hosting-clips" ]
+  , text " "
+  , a [ href "https://twitter.com/wondible" ]
+    [ icon "twitter", text "@wondible" ]
+  , text " "
+  , a [ href "https://twitch.tv/wondible" ]
+    [ icon "twitch", text "wondible" ]
+  ]
+
+icon : String -> Html msg
+icon name =
+  svg [ Svg.Attributes.class ("icon icon-"++name) ]
+    [ use [ xlinkHref ("#icon-"++name) ] [] ]
