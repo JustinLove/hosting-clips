@@ -14,7 +14,6 @@ Displays random clips from people hosting you on Twitch.
 
 ## Limitations
 
-- Currently has no way to determine clip length
 - Currently have no way to determine channel mature flag
 - The hosting API is not part of the official Twitch API and requires a CORS proxy. Currently using [https://cors-proxy.htmldriven.com/]
 ## Compiling
