@@ -18,6 +18,7 @@ type alias Clip =
   { id : String
   , embedUrl : String
   , broadcasterId : String
+  , duration : Maybe Float
   }
 
 type alias Host =

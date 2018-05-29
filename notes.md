@@ -1,4 +1,3 @@
-- clip length
 - no-user name entry box
 - own CORS proxy
 - mature flag?

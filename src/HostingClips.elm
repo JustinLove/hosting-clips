@@ -2,6 +2,7 @@ module HostingClips exposing (..)
 
 import Twitch.Helix.Decode as Helix
 import Twitch.Tmi.Decode as Tmi
+import Twitch.ClipsV2.Decode as ClipsV2
 import Twitch.Helix as Helix
 import TwitchId
 import View exposing (Choice(..), Clip, Host)
@@ -27,6 +28,7 @@ type Msg
   = User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips String (Result Http.Error (List Helix.Clip))
+  | ClipDetails (Result Http.Error ClipsV2.Clip)
   | Pick Int
   | NextChoice Time
   | Response Msg
@@ -162,10 +164,31 @@ update msg model =
     Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
+    ClipDetails (Ok twitchClip) ->
+      ( { model | thanks =
+        case model.thanks of
+          ThanksClip name clip ->
+            ThanksClip name {clip | duration = Just (twitchClip.duration * Time.second)}
+          _ -> model.thanks
+        }
+      , Cmd.none
+      )
+    ClipDetails (Err error) ->
+      let _ = Debug.log "clip detail fetch error" error in
+      (model, Cmd.none)
     Pick index ->
-      ( { model
-        | thanks = Array.get index model.clips
+      let
+        thanks = Array.get index model.clips
           |> Maybe.withDefault NoHosts
+      in
+      ( { model
+        | thanks = thanks
+        , pendingRequests = List.append
+          [ case thanks of
+              ThanksClip _ clip -> fetchClip clip.id
+              _ -> Cmd.none
+          ]
+          model.pendingRequests
         }
       , Cmd.none
       )
@@ -210,7 +233,10 @@ subscriptions model =
         Sub.none
       else
         case model.thanks of
-          ThanksClip _ _ -> Time.every clipCycleTime NextChoice
+          ThanksClip _ {duration} ->
+            Time.every
+              (duration |> Maybe.withDefault clipCycleTime)
+              NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
     , Window.resizes WindowSize
@@ -269,6 +295,22 @@ fetchClips id =
     , url = (fetchClipsUrl id)
     }
 
+fetchClipUrl : String -> String
+fetchClipUrl slug =
+  "https://clips.twitch.tv/api/v2/clips/" ++ slug
+
+fetchClip : String -> Cmd Msg
+fetchClip slug =
+  Http.send (Response << ClipDetails) <| Http.request
+    { method = "GET"
+    , headers = []
+    , url = fetchClipUrl slug
+    , body = Http.emptyBody
+    , expect = Http.expectJson ClipsV2.clip
+    , timeout = Nothing
+    , withCredentials = False
+    }
+
 fetchHostsUrl : String -> String
 fetchHostsUrl id =
   "http://tmi.twitch.tv/hosts?include_logins=1&target=" ++ id
@@ -303,6 +345,7 @@ myClip clip =
   { id = clip.id
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
+  , duration = Nothing
   }
 
 myHost : Tmi.Host -> Host
