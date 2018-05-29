@@ -112,6 +112,15 @@ update msg model =
         hosts = List.map myHost twitchHosts
         requests = hosts
           |> List.take model.hostLimit
+          |> List.filter (\{hostDisplayName} ->
+            not <| Array.foldl (\choice found ->
+              found ||
+              case choice of
+                ThanksClip name _ -> name == hostDisplayName
+                Thanks name -> name == hostDisplayName
+                NoHosts -> False
+              ) False model.clips
+            )
           |> List.map (\{hostId} -> fetchClips hostId)
       in
       ( { model
@@ -153,7 +162,18 @@ update msg model =
       , Cmd.none
       )
     NextChoice time ->
-      ( model, pickCommand model.clips )
+      ( { model
+        | pendingRequests = List.append model.pendingRequests
+          [ if model.hostLimit >= List.length model.hosts then
+              case model.userId of
+                Just id -> fetchHosts id
+                Nothing -> Cmd.none
+            else
+              Cmd.none
+          ]
+        }
+      , pickCommand model.clips
+      )
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
     NextRequest _ ->

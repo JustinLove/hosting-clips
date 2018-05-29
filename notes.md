@@ -1,9 +1,8 @@
 - automatic video height
-- update hosts
-- clip length?
-- mature flag?
 - linkbacks
 - own CORS proxy
+- clip length?
+- mature flag?
 
 ## CORS proxy
 
