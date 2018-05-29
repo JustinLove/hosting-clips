@@ -5,9 +5,10 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (on)
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
+import Json.Decode
 
 type Msg
-  = None
+  = SetUsername String
 
 type Choice
   = ThanksClip String Clip
@@ -61,6 +62,9 @@ body {
 .no-hosts .host-command {
   text-align: center;
 }
+.no-hosts .name-entry {
+  text-align: center;
+}
 footer {
   position: fixed;
   bottom: 0;
@@ -102,7 +106,10 @@ view model =
             [ h1 [ class "thanks" ] [ text "Thanks for watching!" ]
             , case model.login of
               Just name -> h2 [ class "host-command" ] [ text ("/host " ++ name) ]
-              Nothing -> text ""
+              Nothing ->
+                case model.userId of
+                  Just _ -> text ""
+                  Nothing -> displayNameEntryBox model.login
             ]
     , displayFooter
     ]
@@ -146,7 +153,27 @@ displayFooter =
     [ icon "twitch", text "wondible" ]
   ]
 
+displayNameEntryBox : Maybe String -> Html Msg
+displayNameEntryBox login =
+  div [ class "name-entry" ]
+    [ label [ for "channelname" ] [ text "Channel Name" ]
+    , text " "
+    , input
+      [ type_ "text"
+      , id "channelname"
+      , name "channelname"
+      , placeholder (Maybe.withDefault "" login)
+      , on "change" <| targetValue Json.Decode.string SetUsername
+      ] []
+    ]
+
 icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
     [ use [ xlinkHref ("#icon-"++name) ] [] ]
+
+
+targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
+targetValue decoder tagger =
+  Json.Decode.map tagger
+    (Json.Decode.at ["target", "value" ] decoder)

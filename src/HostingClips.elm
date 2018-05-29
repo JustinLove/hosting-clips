@@ -219,8 +219,12 @@ update msg model =
       ( { model | location = location }, Cmd.none)
     WindowSize size ->
       ( { model | windowWidth = size.width, windowHeight = size.height }, Cmd.none)
-    UI (View.None) ->
-      ( model , Cmd.none)
+    UI (View.SetUsername username) ->
+      ( { model
+        | pendingRequests =
+          List.append [fetchUserByName username] model.pendingRequests
+        }
+      , Cmd.none)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
