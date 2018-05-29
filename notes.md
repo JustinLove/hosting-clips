@@ -1,4 +1,3 @@
-- automatic video height
 - linkbacks
 - own CORS proxy
 - clip length?

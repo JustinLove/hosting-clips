@@ -14,6 +14,8 @@ import Dict exposing (Dict)
 import Json.Decode
 import Array exposing (Array)
 import Random
+import Task
+import Window
 
 requestLimit = 100
 rateLimit = 30
@@ -30,10 +32,13 @@ type Msg
   | Response Msg
   | NextRequest Time
   | CurrentUrl Location
+  | WindowSize Window.Size
   | UI (View.Msg)
 
 type alias Model =
   { location : Location
+  , windowWidth : Int
+  , windowHeight : Int
   , login : Maybe String
   , userId : Maybe String
   , showClip : Bool
@@ -60,8 +65,9 @@ init location =
     mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
     mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
   in
-  update (NextRequest 0)
-    { location = location
+  ( { location = location
+    , windowWidth = 852
+    , windowHeight = 480
     , login = mlogin
     , userId = muserId
     , showClip = case Maybe.withDefault "true" mshowClip of
@@ -85,6 +91,8 @@ init location =
       |> List.filter (\c -> c /= Cmd.none)
     , outstandingRequests = 0
     }
+  , Task.perform WindowSize Window.size
+  )
 
 update msg model =
   case msg of
@@ -186,6 +194,8 @@ update msg model =
         _ -> (model, Cmd.none)
     CurrentUrl location ->
       ( { model | location = location }, Cmd.none)
+    WindowSize size ->
+      ( { model | windowWidth = size.width, windowHeight = size.height }, Cmd.none)
     UI (View.None) ->
       ( model , Cmd.none)
 
@@ -203,6 +213,7 @@ subscriptions model =
           ThanksClip _ _ -> Time.every clipCycleTime NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
+    , Window.resizes WindowSize
     ]
 
 maybePickCommand : Array a -> Array a -> Cmd Msg

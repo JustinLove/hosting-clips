@@ -31,6 +31,7 @@ body {
 }
 .view {
   height: 100%;
+  position: relative;
 }
 .host h1 {
   background-color: #2c2541;
@@ -64,7 +65,7 @@ view model =
           div [ class "host clip" ]
             [ displayName name
             , if model.showClip then
-                displayClip clip
+                displayClip model.windowWidth (model.windowHeight - 50) clip
               else
                 text clip.embedUrl
             ]
@@ -89,14 +90,14 @@ displayName name =
     , text " for the host"
     ]
 
-displayClip : Clip -> Html msg
-displayClip clip =
+displayClip : Int -> Int -> Clip -> Html msg
+displayClip width height clip =
   iframe
     [ src clip.embedUrl
     , sandbox "allow-scripts allow-same-origin"
     , attribute "allow" "autoplay"
-    , attribute "width" "100%"
-    , attribute "height" "600"
+    , attribute "width" (toString width)
+    , attribute "height" (toString height)
     , attribute "scrolling" "no"
     , attribute "frameborder" "0"
     ] []
