@@ -1,5 +1,5 @@
-- display for no user selected
 - automatic video height
+- update hosts
 - clip length?
 - mature flag?
 - linkbacks

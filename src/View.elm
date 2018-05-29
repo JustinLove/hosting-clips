@@ -29,7 +29,10 @@ body {
   background-color: rgb(23, 20, 31);
   color: rgb(218, 216, 222);
 }
-h1 {
+.view {
+  height: 100%;
+}
+.host h1 {
   background-color: #2c2541;
   color: rgb(250, 249, 250);
   margin: 0;
@@ -39,14 +42,26 @@ h1 {
 .channel-name {
   color: rgb(218, 216, 222);
 }
+.no-hosts {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+.no-hosts .thanks {
+  text-align: center;
+}
+.no-hosts .host-command {
+  text-align: center;
+}
 """
 
 view model = 
-  div []
+  div [ class "view" ]
     [ node "style" [] [ text css ]
     , case model.thanks of
         ThanksClip name clip ->
-          div []
+          div [ class "host clip" ]
             [ displayName name
             , if model.showClip then
                 displayClip clip
@@ -54,10 +69,16 @@ view model =
                 text clip.embedUrl
             ]
         Thanks name ->
-          div []
+          div [ class "host no-clip" ]
             [ displayName name
             ]
-        NoHosts -> text ""
+        NoHosts ->
+          div [ class "no-hosts" ]
+            [ h1 [ class "thanks" ] [ text "Thanks for watching!" ]
+            , case model.login of
+              Just name -> h2 [ class "host-command" ] [ text ("/host " ++ name) ]
+              Nothing -> text ""
+            ]
     ]
 
 displayName : String -> Html msg
