@@ -1,4 +1,3 @@
-- own CORS proxy
 - mature flag?
 
 ## CORS proxy

@@ -320,29 +320,16 @@ fetchClip slug =
 
 fetchHostsUrl : String -> String
 fetchHostsUrl id =
-  "http://tmi.twitch.tv/hosts?include_logins=1&target=" ++ id
-
-corsWorkaround : String -> String
-corsWorkaround url =
-  "https://cors-proxy.htmldriven.com/?url=" ++ (Http.encodeUri url)
-
-corsUnwrap : Json.Decode.Decoder a -> Json.Decode.Decoder a
-corsUnwrap decoder =
-  Json.Decode.field "body" Json.Decode.string
-    |> Json.Decode.andThen (\body ->
-      case Json.Decode.decodeString decoder body of
-        Ok a -> Json.Decode.succeed a
-        Err err -> Json.Decode.fail err
-      )
+  "https://p3szakkejk.execute-api.us-east-1.amazonaws.com/production/hosts?include_logins=1&target=" ++ id
 
 fetchHosts : String -> Cmd Msg
 fetchHosts id =
   Http.send (Response << Hosts) <| Http.request
     { method = "GET"
     , headers = []
-    , url = corsWorkaround (fetchHostsUrl id)
+    , url = fetchHostsUrl id
     , body = Http.emptyBody
-    , expect = Http.expectJson (corsUnwrap Tmi.hosts)
+    , expect = Http.expectJson Tmi.hosts
     , timeout = Nothing
     , withCredentials = False
     }
