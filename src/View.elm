@@ -13,6 +13,7 @@ type Msg
 type Choice
   = ThanksClip String Clip
   | Thanks String
+  | SelfClip Clip
   | NoHosts
 
 type alias Clip =
@@ -100,6 +101,19 @@ view model =
         Thanks name ->
           div [ class "host no-clip" ]
             [ displayName name
+            ]
+        SelfClip clip ->
+          div [ class "self host clip" ]
+            [ h1 []
+              [ text "You are watching "
+              , span [ class "channel-name" ]
+                [ text (model.login |> Maybe.withDefault "somebody...?")
+                ]
+              ]
+            , if model.showClip then
+                displayClip model.windowWidth (model.windowHeight - 75) clip
+              else
+                text clip.embedUrl
             ]
         NoHosts ->
           div [ class "no-hosts" ]

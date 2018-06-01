@@ -84,7 +84,11 @@ init location =
     , thanks = NoHosts
     , pendingRequests =
       (case muserId of
-          Just id -> [ fetchHosts id, fetchUserById id ]
+          Just id ->
+            [ fetchUserById id
+            , fetchHosts id
+            , fetchClips id
+            ]
           Nothing ->
             case mlogin of
               Just login -> [ fetchUserByName login ]
@@ -110,6 +114,7 @@ update msg model =
           Cmd.batch
             [ Navigation.modifyUrl (createPath m2)
             , fetchHosts user.id
+            , fetchClips user.id
             ]
         else
           Cmd.none
@@ -131,6 +136,7 @@ update msg model =
               case choice of
                 ThanksClip name _ -> name == hostDisplayName
                 Thanks name -> name == hostDisplayName
+                SelfClip _ -> False
                 NoHosts -> False
               ) False model.clips
             )
@@ -157,7 +163,10 @@ update msg model =
         new = twitchClips
           |> List.map myClip
           |> List.map (\clip ->
-              ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
+              if (Just id) == model.userId then
+                SelfClip clip
+              else
+                ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
           )
         clips = Array.append model.clips (Array.fromList new)
       in
@@ -172,6 +181,8 @@ update msg model =
         case model.thanks of
           ThanksClip name clip ->
             ThanksClip name {clip | duration = Just (twitchClip.duration * Time.second)}
+          SelfClip clip ->
+            SelfClip {clip | duration = Just (twitchClip.duration * Time.second)}
           _ -> model.thanks
         }
       , Cmd.none
@@ -189,6 +200,7 @@ update msg model =
         , pendingRequests = List.append
           [ case thanks of
               ThanksClip _ clip -> fetchClip clip.id
+              SelfClip clip -> fetchClip clip.id
               _ -> Cmd.none
           ]
           model.pendingRequests
@@ -241,6 +253,10 @@ subscriptions model =
       else
         case model.thanks of
           ThanksClip _ {duration} ->
+            Time.every
+              (duration |> Maybe.withDefault clipCycleTime)
+              NextChoice
+          SelfClip {duration} ->
             Time.every
               (duration |> Maybe.withDefault clipCycleTime)
               NextChoice
