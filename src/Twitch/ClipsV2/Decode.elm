@@ -101,7 +101,10 @@ clip =
     |> map2 (|>) (field "curator_logo" string)
     |> map2 (|>) (field "preview_image" string)
     |> map2 (|>) (field "thumbnails" (dict string))
-    |> map2 (|>) (field "communities" (list string))
+    |> map2 (|>) (oneOf
+      [ (field "communities" (list string))
+      , (succeed [])
+      ])
     |> map2 (|>) (field "created_at" timeStamp)
     |> map2 (|>) (field "title" string)
     |> map2 (|>) (field "language" string)
