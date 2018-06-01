@@ -62,10 +62,10 @@ main = Navigation.program CurrentUrl
 init : Location -> (Model, Cmd Msg)
 init location =
   let
-    mlogin = Debug.log "Login" <| extractSearchArgument "login" location
-    muserId = Debug.log "userId" <| extractSearchArgument "userId" location
-    mshowClip = Debug.log "showClip" <| extractSearchArgument "showClip" location
-    mhostLimit = Debug.log "hostLimit" <| extractSearchArgument "hostLimit" location
+    mlogin = extractSearchArgument "login" location
+    muserId = extractSearchArgument "userId" location
+    mshowClip = extractSearchArgument "showClip" location
+    mhostLimit = extractSearchArgument "hostLimit" location
   in
   ( { location = location
     , windowWidth = 852
