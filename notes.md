@@ -1,3 +1,7 @@
+- clip priority
+- add clip link
+- cacheing
+- exclusions
 - mature flag?
 
 ## CORS proxy
