@@ -10,12 +10,12 @@ persist : Decoder Persist
 persist =
   map3 Persist
     (field "exclusions" (list string))
+    (field "durations" (keyValuePairs float))
     ( oneOf
-      [ (field "durations" (keyValuePairs float))
-      , succeed []
+      [ (field "clipCache" clipCache)
+      , succeed Dict.empty
       ]
     )
-    (field "clipCache" clipCache)
 
 clipCache : Decoder (Dict String (Time, List Clip))
 clipCache =

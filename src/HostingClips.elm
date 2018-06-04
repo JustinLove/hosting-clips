@@ -1,6 +1,6 @@
 module HostingClips exposing (..)
 
-import Persist exposing (Persist)
+import Persist exposing (Persist, Clip)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Decode as Helix
@@ -8,7 +8,7 @@ import Twitch.Tmi.Decode as Tmi
 import Twitch.ClipsV2.Decode as ClipsV2
 import Twitch.Helix as Helix
 import TwitchId
-import View exposing (Choice(..), Clip, Host)
+import View exposing (Choice(..), Host)
 import Harbor
 
 import Html
@@ -124,6 +124,7 @@ update msg model =
             { model
             | exclusions = state.exclusions
             , durations = Dict.fromList state.durations
+            , clipCache = state.clipCache
             }
           Nothing ->
             model
@@ -180,7 +181,8 @@ update msg model =
       let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
     Clips id (Ok []) ->
-      ( if (Just id) == model.userId then
+      let
+       m2 = if (Just id) == model.userId then
           { model
           | clipCache = Dict.insert id (model.time, []) model.clipCache
           }
@@ -191,7 +193,9 @@ update msg model =
             (Thanks (displayNameForHost model.hosts id))
             model.clips
           }
-      , maybePickCommand model
+      in
+      ( m2
+      , Cmd.batch [ saveState m2, maybePickCommand model ]
       )
     Clips id (Ok twitchClips) ->
       let
@@ -206,12 +210,14 @@ update msg model =
                 ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
           )
         choices = Array.append model.clips (Array.fromList new)
+        m2 =
+          { model
+          | clipCache = Dict.insert id (model.time, clips) model.clipCache
+          , clips = choices
+          }
       in
-      ( { model
-        | clipCache = Dict.insert id (model.time, clips) model.clipCache
-        , clips = choices
-        }
-      , maybePickCommand model
+      ( m2
+      , Cmd.batch [ saveState m2, maybePickCommand model ]
       )
     Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
@@ -333,7 +339,7 @@ persist model =
 
 saveState : Model -> Cmd Msg
 saveState model =
-  Persist model.exclusions (Dict.toList model.durations)
+  Persist model.exclusions (Dict.toList model.durations) model.clipCache
     |> Persist.Encode.persist
     |> Json.Encode.encode 0
     |> Harbor.save

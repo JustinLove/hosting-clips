@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Choice(..), Clip, Host, view)
+module View exposing (Msg(..), Choice(..), Host, view)
 
 import Persist exposing (Clip)
 
