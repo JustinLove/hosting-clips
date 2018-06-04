@@ -1,4 +1,4 @@
-import Persist exposing (Persist)
+import Persist exposing (Persist, Clip)
 import Persist.Decode
 import Persist.Encode
 
@@ -8,6 +8,7 @@ import Runner exposing (runAll)
 
 import Html exposing (Html)
 import Json.Decode
+import Dict
 
 main : Html msg
 main =
@@ -15,12 +16,36 @@ main =
 
 all : Test
 all = describe "serialization"
-  [ it "roundtrips persist" <| roundTrips
+  [ it "roundtrips clip" <| roundTrips
+    Persist.Encode.clip
+    Persist.Decode.clip
+    { id = "clip id"
+    , url = "url"
+    , embedUrl = "embed url"
+    , broadcasterId = "host id"
+    , duration = Nothing
+    }
+  , it "roundtrips persist" <| roundTrips
     Persist.Encode.persist
     Persist.Decode.persist
     ( Persist
       [ "clip id" ]
       [ ("clip id", 1) ]
+      ( Dict.fromList
+        [ ("host id",
+            (1,
+              [
+                { id = "clip id"
+                , url = "url"
+                , embedUrl = "embed url"
+                , broadcasterId = "host id"
+                , duration = Nothing
+                }
+              ]
+            )
+          )
+        ]
+      )
     )
   ]
 

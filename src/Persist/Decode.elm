@@ -1,15 +1,35 @@
-module Persist.Decode exposing (persist)
+module Persist.Decode exposing (persist, clip)
 
-import Persist exposing (Persist)
+import Persist exposing (Persist, Clip)
 
 import Json.Decode exposing (..)
+import Dict exposing (Dict)
+import Time exposing (Time)
 
 persist : Decoder Persist
 persist =
-  map2 Persist
+  map3 Persist
     (field "exclusions" (list string))
     ( oneOf
       [ (field "durations" (keyValuePairs float))
       , succeed []
       ]
     )
+    (field "clipCache" clipCache)
+
+clipCache : Decoder (Dict String (Time, List Clip))
+clipCache =
+  dict
+    <| map2 (,)
+      (field "time" float)
+      (field "clips" (list clip))
+
+clip : Decoder Clip
+clip =
+  map5 Clip
+    (field "id" string)
+    (field "url" string)
+    (field "embedUrl" string)
+    (field "broadcasterId" string)
+    (succeed Nothing)
+

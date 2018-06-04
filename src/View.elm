@@ -1,5 +1,7 @@
 module View exposing (Msg(..), Choice(..), Clip, Host, view)
 
+import Persist exposing (Clip)
+
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on, onClick)
@@ -16,14 +18,6 @@ type Choice
   | Thanks String
   | SelfClip Clip
   | NoHosts
-
-type alias Clip =
-  { id : String
-  , url : String
-  , embedUrl : String
-  , broadcasterId : String
-  , duration : Maybe Float
-  }
 
 type alias Host =
   { hostId : String
