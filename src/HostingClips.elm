@@ -196,10 +196,14 @@ update msg model =
       (model, Cmd.none)
     Pick (self, selector) ->
       let
-        clips = if self then
-            Array.filter isSelf model.clips
-          else
-            Array.filter (not<<isSelf) model.clips
+        selfClips = Array.filter isSelf model.clips
+        otherClips = Array.filter (not<<isSelf) model.clips
+        clips = case (self, Array.length selfClips, Array.length otherClips) of
+          (_, 0, 0) -> Array.empty
+          (_, 0, _) -> otherClips
+          (_, _, 0) -> selfClips
+          (True, _, _) -> selfClips
+          (False, _, _) -> otherClips
         index = floor (selector * (toFloat (Array.length clips)))
         thanks = Array.get index clips
           |> Maybe.withDefault NoHosts

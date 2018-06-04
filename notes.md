@@ -1,4 +1,3 @@
-- stuck on nohosts for too long
 - cacheing
 - exclusions
 - mature flag?
