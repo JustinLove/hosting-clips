@@ -50,6 +50,7 @@ type alias Model =
   , hosts : List Host
   , clips : Array Choice
   , thanks : Choice
+  , exclusions : List String
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -84,6 +85,7 @@ init location =
     , hosts = []
     , clips = Array.empty
     , thanks = NoHosts
+    , exclusions = []
     , pendingRequests =
       (case muserId of
           Just id ->
@@ -172,6 +174,7 @@ update msg model =
       let
         new = twitchClips
           |> List.map myClip
+          |> List.filter (notExcluded model.exclusions)
           |> List.map (\clip ->
               if (Just id) == model.userId then
                 SelfClip clip
@@ -306,6 +309,10 @@ isSelf choice =
   case choice of
     SelfClip _ -> True
     _ -> False
+
+notExcluded : List String -> Clip -> Bool
+notExcluded exclusions clip =
+  not <| List.any (\ex -> clip.id == ex) exclusions
 
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
