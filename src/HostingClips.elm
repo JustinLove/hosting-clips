@@ -87,7 +87,7 @@ init location =
           Just id ->
             [ fetchUserById id
             , fetchHosts id
-            , fetchClips id
+            , fetchClips 100 id
             ]
           Nothing ->
             case mlogin of
@@ -114,7 +114,7 @@ update msg model =
           Cmd.batch
             [ Navigation.modifyUrl (createPath m2)
             , fetchHosts user.id
-            , fetchClips user.id
+            , fetchClips 100 user.id
             ]
         else
           Cmd.none
@@ -140,7 +140,7 @@ update msg model =
                 NoHosts -> False
               ) False model.clips
             )
-          |> List.map (\{hostId} -> fetchClips hostId)
+          |> List.map (\{hostId} -> fetchClips 20 hostId)
       in
       ( { model
         | hosts = hosts
@@ -328,18 +328,18 @@ fetchUserById id =
     , url = (fetchUserByIdUrl id)
     }
 
-fetchClipsUrl : String -> String
-fetchClipsUrl id =
-  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id
+fetchClipsUrl : Int -> String -> String
+fetchClipsUrl count id =
+  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (toString count)
 
-fetchClips : String -> Cmd Msg
-fetchClips id =
+fetchClips : Int -> String -> Cmd Msg
+fetchClips count id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = Nothing
     , decoder = Helix.clips
     , tagger = Response << Clips id
-    , url = (fetchClipsUrl id)
+    , url = (fetchClipsUrl count id)
     }
 
 fetchClipUrl : String -> String
