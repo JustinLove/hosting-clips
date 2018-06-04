@@ -229,7 +229,7 @@ update msg model =
         }
       , Cmd.none
       )
-    NextChoice time ->
+    NextChoice _ ->
       ( { model
         | pendingRequests = List.append model.pendingRequests
           [ if model.hostLimit >= List.length model.hosts then
@@ -262,6 +262,18 @@ update msg model =
           List.append [fetchUserByName username] model.pendingRequests
         }
       , Cmd.none)
+    UI (View.Exclude id) ->
+      ( { model
+        | exclusions = id :: model.exclusions
+        , clips = model.clips
+          |> Array.filter (\choice ->
+            case choice of
+              ThanksClip _ clip -> notExcluded model.exclusions clip
+              SelfClip clip -> notExcluded model.exclusions clip
+              _ -> True
+            )
+        }
+      , pickCommand model )
 
 subscriptions : Model -> Sub Msg
 subscriptions model =

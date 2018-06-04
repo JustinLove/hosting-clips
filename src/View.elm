@@ -2,13 +2,14 @@ module View exposing (Msg(..), Choice(..), Clip, Host, view)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (on)
+import Html.Events exposing (on, onClick)
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
 import Json.Decode
 
 type Msg
   = SetUsername String
+  | Exclude String
 
 type Choice
   = ThanksClip String Clip
@@ -73,6 +74,17 @@ body {
   flex-direction: column;
   justify-content: center;
 }
+.actions {
+  position: fixed;
+  bottom: 0;
+  right: 15em;
+}
+.actions button {
+  background-color: rgb(23, 20, 31);
+  color: rgb(218, 216, 222);
+  border: none;
+  color: #8879a5;
+}
 footer {
   position: fixed;
   bottom: 0;
@@ -104,6 +116,7 @@ view model =
                 displayClip model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
+            , displayActions clip
             ]
         Thanks name ->
           div [ class "host no-clip" ]
@@ -121,6 +134,7 @@ view model =
                 displayClip model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
+            , displayActions clip
             ]
         NoHosts ->
           div [ class "no-hosts" ]
@@ -171,18 +185,24 @@ displayClip width height clip =
       ] []
     ]
 
+displayActions : Clip -> Html Msg
+displayActions clip =
+  div [ class "actions" ]
+    [ button [ onClick (Exclude clip.id) ] [ text ("exclude " ++ clip.id) ]
+    ]
+
 displayFooter : Html msg
 displayFooter =
   footer []
-  [ a [ href "https://github.com/JustinLove/hosting-clips" ]
-    [ icon "github", text "hosting-clips" ]
-  , text " "
-  , a [ href "https://twitter.com/wondible" ]
-    [ icon "twitter", text "@wondible" ]
-  , text " "
-  , a [ href "https://twitch.tv/wondible" ]
-    [ icon "twitch", text "wondible" ]
-  ]
+    [ a [ href "https://github.com/JustinLove/hosting-clips" ]
+      [ icon "github", text "hosting-clips" ]
+    , text " "
+    , a [ href "https://twitter.com/wondible" ]
+      [ icon "twitter", text "@wondible" ]
+    , text " "
+    , a [ href "https://twitch.tv/wondible" ]
+      [ icon "twitch", text "wondible" ]
+    ]
 
 displayNameEntryBox : Maybe String -> Html Msg
 displayNameEntryBox login =
