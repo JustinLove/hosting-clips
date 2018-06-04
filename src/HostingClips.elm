@@ -49,12 +49,14 @@ type alias Model =
   { location : Location
   , windowWidth : Int
   , windowHeight : Int
+  , time : Time
   , login : Maybe String
   , userId : Maybe String
   , showClip : Bool
   , hostLimit : Int
   , hosts : List Host
   , durations : Dict String Time
+  , clipCache : Dict String (Time, List Clip)
   , clips : Array Choice
   , thanks : Choice
   , exclusions : List String
@@ -80,6 +82,7 @@ init location =
   ( { location = location
     , windowWidth = 852
     , windowHeight = 480
+    , time = 0
     , login = mlogin
     , userId = muserId
     , showClip = case Maybe.withDefault "true" mshowClip of
@@ -91,6 +94,7 @@ init location =
       |> Result.withDefault requestLimit
     , hosts = []
     , durations = Dict.empty
+    , clipCache = Dict.empty
     , clips = Array.empty
     , thanks = NoHosts
     , exclusions = []
@@ -177,10 +181,13 @@ update msg model =
       (model, Cmd.none)
     Clips id (Ok []) ->
       ( if (Just id) == model.userId then
-          model
+          { model
+          | clipCache = Dict.insert id (model.time, []) model.clipCache
+          }
         else
           { model
-          | clips = Array.push
+          | clipCache = Dict.insert id (model.time, []) model.clipCache
+          , clips = Array.push
             (Thanks (displayNameForHost model.hosts id))
             model.clips
           }
@@ -188,18 +195,22 @@ update msg model =
       )
     Clips id (Ok twitchClips) ->
       let
-        new = twitchClips
+        clips = twitchClips
           |> List.map (myClip model.durations)
           |> List.filter (notExcluded model.exclusions)
+        new = clips
           |> List.map (\clip ->
               if (Just id) == model.userId then
                 SelfClip clip
               else
                 ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
           )
-        clips = Array.append model.clips (Array.fromList new)
+        choices = Array.append model.clips (Array.fromList new)
       in
-      ( { model | clips = clips }
+      ( { model
+        | clipCache = Dict.insert id (model.time, clips) model.clipCache
+        , clips = choices
+        }
       , maybePickCommand model
       )
     Clips id (Err error) ->
@@ -265,7 +276,7 @@ update msg model =
         }
       , Cmd.none
       )
-    NextChoice _ ->
+    NextChoice time ->
       ( { model
         | pendingRequests = List.append model.pendingRequests
           [ if model.hostLimit >= List.length model.hosts then
@@ -275,19 +286,21 @@ update msg model =
             else
               Cmd.none
           ]
+        , time = time
         }
       , pickCommand model
       )
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
-    NextRequest _ ->
+    NextRequest time ->
       case model.pendingRequests of
         next :: rest ->
           ( { model
             | pendingRequests = rest
             , outstandingRequests = model.outstandingRequests + (if next == Cmd.none then 0 else 1)
+            , time = time
             }, next)
-        _ -> (model, Cmd.none)
+        _ -> ({model | time = time}, Cmd.none)
     CurrentUrl location ->
       ( { model | location = location }, Cmd.none)
     WindowSize size ->
