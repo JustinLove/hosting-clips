@@ -6,6 +6,7 @@ import Twitch.ClipsV2.Decode as ClipsV2
 import Twitch.Helix as Helix
 import TwitchId
 import View exposing (Choice(..), Clip, Host)
+import Harbor
 
 import Html
 import Navigation exposing (Location)
@@ -25,7 +26,8 @@ clipCycleTime = 60*Time.second
 noClipCycleTime = 10*Time.second
 
 type Msg
-  = User (Result Http.Error (List Helix.User))
+  = Loaded (Maybe String)
+  | User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips String (Result Http.Error (List Helix.Clip))
   | ClipDetails (Result Http.Error ClipsV2.Clip)
@@ -102,6 +104,10 @@ init location =
 
 update msg model =
   case msg of
+    Loaded mstate ->
+      ( model
+      , Cmd.none
+      )
     User (Ok (user::_)) ->
       let m2 =
         { model
@@ -275,6 +281,7 @@ subscriptions model =
               NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
+    , Harbor.loaded Loaded
     , Window.resizes WindowSize
     ]
 

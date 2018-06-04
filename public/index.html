@@ -32,6 +32,15 @@
 
 <script type="text/javascript">
   var app = Elm.HostingClips.fullscreen()
+
+  var key = 'hosting-clips'
+
+  app.ports.save.subscribe(function(value) {
+    localStorage.setItem(key, value)
+  })
+
+  var loaded = localStorage.getItem(key)
+  app.ports.loaded.send(loaded)
 </script>
 
 </html>
