@@ -1,5 +1,5 @@
-- clip priority
 - add clip link
+- broadcaster has no clips, case in update for no clips
 - cacheing
 - exclusions
 - mature flag?

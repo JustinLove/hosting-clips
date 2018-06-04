@@ -29,7 +29,7 @@ type Msg
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips String (Result Http.Error (List Helix.Clip))
   | ClipDetails (Result Http.Error ClipsV2.Clip)
-  | Pick Int
+  | Pick (Bool, Float)
   | NextChoice Time
   | Response Msg
   | NextRequest Time
@@ -156,7 +156,7 @@ update msg model =
         clips = Array.push (Thanks (displayNameForHost model.hosts id)) model.clips
       in
       ( { model | clips = clips }
-      , maybePickCommand model.clips clips
+      , maybePickCommand model
       )
     Clips id (Ok twitchClips) ->
       let
@@ -171,7 +171,7 @@ update msg model =
         clips = Array.append model.clips (Array.fromList new)
       in
       ( { model | clips = clips }
-      , maybePickCommand model.clips clips
+      , maybePickCommand model
       )
     Clips id (Err error) ->
       let _ = Debug.log "clip fetch error" error in
@@ -190,9 +190,14 @@ update msg model =
     ClipDetails (Err error) ->
       let _ = Debug.log "clip detail fetch error" error in
       (model, Cmd.none)
-    Pick index ->
+    Pick (self, selector) ->
       let
-        thanks = Array.get index model.clips
+        clips = if self then
+            Array.filter isSelf model.clips
+          else
+            Array.filter (not<<isSelf) model.clips
+        index = floor (selector * (toFloat (Array.length clips)))
+        thanks = Array.get index clips
           |> Maybe.withDefault NoHosts
       in
       ( { model
@@ -218,7 +223,7 @@ update msg model =
               Cmd.none
           ]
         }
-      , pickCommand model.clips
+      , pickCommand model
       )
     Response subMsg ->
       update subMsg { model | outstandingRequests = model.outstandingRequests - 1}
@@ -265,16 +270,27 @@ subscriptions model =
     , Window.resizes WindowSize
     ]
 
-maybePickCommand : Array a -> Array a -> Cmd Msg
-maybePickCommand before after =
-  if Array.isEmpty before then
-    pickCommand after
+maybePickCommand : Model -> Cmd Msg
+maybePickCommand model =
+  if Array.isEmpty model.clips then
+    pickCommand model
   else
     Cmd.none
 
-pickCommand : Array a -> Cmd Msg
-pickCommand clips = 
-  Random.generate Pick (Random.int 0 ((Array.length clips) - 1))
+pickCommand : Model -> Cmd Msg
+pickCommand model = 
+  Random.generate Pick
+    <| Random.map2 (,)
+      (Random.int 0 (List.length model.hosts)
+        |> Random.map (\i -> i == 0)
+      )
+      (Random.float 0 1)
+
+isSelf : Choice -> Bool
+isSelf choice =
+  case choice of
+    SelfClip _ -> True
+    _ -> False
 
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
