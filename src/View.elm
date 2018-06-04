@@ -18,6 +18,7 @@ type Choice
 
 type alias Clip =
   { id : String
+  , url : String
   , embedUrl : String
   , broadcasterId : String
   , duration : Maybe Float
@@ -65,6 +66,12 @@ body {
 }
 .no-hosts .name-entry {
   text-align: center;
+}
+.clip-url {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 footer {
   position: fixed;
@@ -138,21 +145,31 @@ displayName name =
 
 displayClip : Int -> Int -> Clip -> Html msg
 displayClip width height clip =
-  iframe
-    [ src clip.embedUrl
-    , sandbox "allow-scripts allow-same-origin"
-    , attribute "allow" "autoplay"
-    , attribute "width" (toString ((toFloat width) * 0.8))
-    , attribute "height" (toString ((toFloat height) * 0.8))
-    , attribute "scrolling" "no"
-    , attribute "frameborder" "0"
-    , style
-      [ ("padding",
-          (toString ((toFloat height) * 0.1)) ++ "px " ++
-          (toString ((toFloat width) * 0.1)) ++ "px"
-        )
+  div []
+    [ div
+      [ class "clip-url"
+      , style
+        [ ("height", (toString ((toFloat height) * 0.1)) ++ "px ")
+        , ("margin-bottom", (toString ((toFloat height) * -0.1)) ++ "px ")
+        ]
       ]
-    ] []
+      [ a [ href clip.url ] [ text clip.url ] ]
+    , iframe
+      [ src clip.embedUrl
+      , sandbox "allow-scripts allow-same-origin"
+      , attribute "allow" "autoplay"
+      , attribute "width" (toString ((toFloat width) * 0.8))
+      , attribute "height" (toString ((toFloat height) * 0.8))
+      , attribute "scrolling" "no"
+      , attribute "frameborder" "0"
+      , style
+        [ ("padding",
+            (toString ((toFloat height) * 0.1)) ++ "px " ++
+            (toString ((toFloat width) * 0.1)) ++ "px"
+          )
+        ]
+      ] []
+    ]
 
 displayFooter : Html msg
 displayFooter =

@@ -152,10 +152,14 @@ update msg model =
       let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
     Clips id (Ok []) ->
-      let
-        clips = Array.push (Thanks (displayNameForHost model.hosts id)) model.clips
-      in
-      ( { model | clips = clips }
+      ( if (Just id) == model.userId then
+          model
+        else
+          { model
+          | clips = Array.push
+            (Thanks (displayNameForHost model.hosts id))
+            model.clips
+          }
       , maybePickCommand model
       )
     Clips id (Ok twitchClips) ->
@@ -369,6 +373,7 @@ fetchHosts id =
 myClip : Helix.Clip -> Clip
 myClip clip =
   { id = clip.id
+  , url = clip.url
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
   , duration = Nothing

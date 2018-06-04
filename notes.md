@@ -1,5 +1,4 @@
-- add clip link
-- broadcaster has no clips, case in update for no clips
+- stuck on nohosts for too long
 - cacheing
 - exclusions
 - mature flag?
