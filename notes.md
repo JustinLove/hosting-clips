@@ -1,5 +1,4 @@
 - cacheing
-- exclusions
 - mature flag?
 
 ## CORS proxy

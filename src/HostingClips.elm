@@ -1,5 +1,8 @@
 module HostingClips exposing (..)
 
+import Persist exposing (Persist)
+import Persist.Encode
+import Persist.Decode
 import Twitch.Helix.Decode as Helix
 import Twitch.Tmi.Decode as Tmi
 import Twitch.ClipsV2.Decode as ClipsV2
@@ -14,6 +17,7 @@ import Http
 import Time exposing (Time)
 import Dict exposing (Dict)
 import Json.Decode
+import Json.Encode
 import Array exposing (Array)
 import Random
 import Task
@@ -26,7 +30,7 @@ clipCycleTime = 60*Time.second
 noClipCycleTime = 10*Time.second
 
 type Msg
-  = Loaded (Maybe String)
+  = Loaded (Maybe Persist)
   | User (Result Http.Error (List Helix.User))
   | Hosts (Result Http.Error (List Tmi.Host))
   | Clips String (Result Http.Error (List Helix.Clip))
@@ -107,7 +111,14 @@ init location =
 update msg model =
   case msg of
     Loaded mstate ->
-      ( model
+      ( ( case mstate of
+          Just state ->
+            { model
+            | exclusions = state.exclusions
+            }
+          Nothing ->
+            model
+        )
       , Cmd.none
       )
     User (Ok (user::_)) ->
@@ -263,7 +274,8 @@ update msg model =
         }
       , Cmd.none)
     UI (View.Exclude id) ->
-      ( { model
+      let m2 =
+        { model
         | exclusions = id :: model.exclusions
         , clips = model.clips
           |> Array.filter (\choice ->
@@ -273,7 +285,16 @@ update msg model =
               _ -> True
             )
         }
-      , pickCommand model )
+      in
+      ( m2
+      , Cmd.batch [ pickCommand model, saveState m2 ])
+
+saveState : Model -> Cmd Msg
+saveState model =
+  Persist model.exclusions
+    |> Persist.Encode.persist
+    |> Json.Encode.encode 0
+    |> Harbor.save
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -296,9 +317,20 @@ subscriptions model =
               NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
-    , Harbor.loaded Loaded
+    , Harbor.loaded receiveLoaded
     , Window.resizes WindowSize
     ]
+
+receiveLoaded : Maybe String -> Msg
+receiveLoaded mstring =
+  mstring
+    |> Maybe.andThen (\string ->
+      string
+       |> Json.Decode.decodeString Persist.Decode.persist
+       |> Result.mapError (Debug.log "persist decode error")
+       |> Result.toMaybe
+      )
+    |> Loaded
 
 maybePickCommand : Model -> Cmd Msg
 maybePickCommand model =
