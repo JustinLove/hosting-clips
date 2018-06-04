@@ -6,5 +6,10 @@ import Json.Decode exposing (..)
 
 persist : Decoder Persist
 persist =
-  map Persist
+  map2 Persist
     (field "exclusions" (list string))
+    ( oneOf
+      [ (field "durations" (keyValuePairs float))
+      , succeed []
+      ]
+    )

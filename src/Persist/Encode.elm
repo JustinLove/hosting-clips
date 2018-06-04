@@ -8,4 +8,5 @@ persist : Persist -> Value
 persist p =
   object
     [ ("exclusions", list <| List.map string p.exclusions)
+    , ("durations", object <| List.map (\(id, time) -> (id, float time)) p.durations)
     ]

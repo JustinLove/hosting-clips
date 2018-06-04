@@ -8,7 +8,6 @@ import Runner exposing (runAll)
 
 import Html exposing (Html)
 import Json.Decode
-import Dict
 
 main : Html msg
 main =
@@ -21,6 +20,7 @@ all = describe "serialization"
     Persist.Decode.persist
     ( Persist
       [ "clip id" ]
+      [ ("clip id", 1) ]
     )
   ]
 

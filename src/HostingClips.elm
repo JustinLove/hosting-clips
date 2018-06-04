@@ -28,6 +28,8 @@ rateLimit = 30
 requestRate = 60*Time.second/rateLimit
 clipCycleTime = 60*Time.second
 noClipCycleTime = 10*Time.second
+selfClipCount = 100
+otherClipCount = 20
 
 type Msg
   = Loaded (Maybe Persist)
@@ -52,6 +54,7 @@ type alias Model =
   , showClip : Bool
   , hostLimit : Int
   , hosts : List Host
+  , durations : Dict String Time
   , clips : Array Choice
   , thanks : Choice
   , exclusions : List String
@@ -87,6 +90,7 @@ init location =
       |> Maybe.withDefault (Err "unspecified")
       |> Result.withDefault requestLimit
     , hosts = []
+    , durations = Dict.empty
     , clips = Array.empty
     , thanks = NoHosts
     , exclusions = []
@@ -95,7 +99,7 @@ init location =
           Just id ->
             [ fetchUserById id
             , fetchHosts id
-            , fetchClips 100 id
+            , fetchClips selfClipCount id
             ]
           Nothing ->
             case mlogin of
@@ -115,6 +119,7 @@ update msg model =
           Just state ->
             { model
             | exclusions = state.exclusions
+            , durations = Dict.fromList state.durations
             }
           Nothing ->
             model
@@ -133,7 +138,7 @@ update msg model =
           Cmd.batch
             [ Navigation.modifyUrl (createPath m2)
             , fetchHosts user.id
-            , fetchClips 100 user.id
+            , fetchClips selfClipCount user.id
             ]
         else
           Cmd.none
@@ -159,7 +164,7 @@ update msg model =
                 NoHosts -> False
               ) False model.clips
             )
-          |> List.map (\{hostId} -> fetchClips 20 hostId)
+          |> List.map (\{hostId} -> fetchClips otherClipCount hostId)
       in
       ( { model
         | hosts = hosts
@@ -184,7 +189,7 @@ update msg model =
     Clips id (Ok twitchClips) ->
       let
         new = twitchClips
-          |> List.map myClip
+          |> List.map (myClip model.durations)
           |> List.filter (notExcluded model.exclusions)
           |> List.map (\clip ->
               if (Just id) == model.userId then
@@ -201,16 +206,28 @@ update msg model =
       let _ = Debug.log "clip fetch error" error in
       (model, Cmd.none)
     ClipDetails (Ok twitchClip) ->
-      ( { model | thanks =
-        case model.thanks of
-          ThanksClip name clip ->
-            ThanksClip name {clip | duration = Just (twitchClip.duration * Time.second)}
-          SelfClip clip ->
-            SelfClip {clip | duration = Just (twitchClip.duration * Time.second)}
-          _ -> model.thanks
+      let
+        duration = twitchClip.duration * Time.second
+        updateDuration choice =
+          case choice of
+            ThanksClip name clip ->
+              if clip.id == twitchClip.slug then
+                ThanksClip name {clip | duration = Just duration}
+              else 
+                choice
+            SelfClip clip ->
+              if clip.id == twitchClip.slug then
+                SelfClip {clip | duration = Just duration}
+              else 
+                choice
+            _ -> choice
+      in
+      persist <|
+        { model
+        | thanks = updateDuration model.thanks
+        , clips = Array.map updateDuration model.clips
+        , durations = Dict.insert twitchClip.slug duration model.durations
         }
-      , Cmd.none
-      )
     ClipDetails (Err error) ->
       let _ = Debug.log "clip detail fetch error" error in
       (model, Cmd.none)
@@ -232,8 +249,16 @@ update msg model =
         | thanks = thanks
         , pendingRequests = List.append
           [ case thanks of
-              ThanksClip _ clip -> fetchClip clip.id
-              SelfClip clip -> fetchClip clip.id
+              ThanksClip _ clip ->
+                if clip.duration == Nothing then
+                  fetchClip clip.id
+                else
+                  Cmd.none
+              SelfClip clip ->
+                if clip.duration == Nothing then
+                  fetchClip clip.id
+                else
+                  Cmd.none
               _ -> Cmd.none
           ]
           model.pendingRequests
@@ -289,9 +314,13 @@ update msg model =
       ( m2
       , Cmd.batch [ pickCommand model, saveState m2 ])
 
+persist : Model -> (Model, Cmd Msg)
+persist model =
+  (model, saveState model)
+
 saveState : Model -> Cmd Msg
 saveState model =
-  Persist model.exclusions
+  Persist model.exclusions (Dict.toList model.durations)
     |> Persist.Encode.persist
     |> Json.Encode.encode 0
     |> Harbor.save
@@ -432,13 +461,13 @@ fetchHosts id =
     , withCredentials = False
     }
 
-myClip : Helix.Clip -> Clip
-myClip clip =
+myClip : Dict String Time -> Helix.Clip -> Clip
+myClip durations clip =
   { id = clip.id
   , url = clip.url
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
-  , duration = Nothing
+  , duration = Dict.get clip.id durations
   }
 
 myHost : Tmi.Host -> Host
