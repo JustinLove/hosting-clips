@@ -1,7 +1,8 @@
-- cache user lookup
-- cache own clips requests
+- pick when loading user cache
 - durations to cache loaded records
+- cache user lookup
 - use hosts intead of clips for host duplicate check
+- skip Cmd.none in queue
 - mature flag?
 
 ## CORS proxy

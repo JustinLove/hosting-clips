@@ -104,7 +104,6 @@ init location =
           Just id ->
             [ fetchUserById id
             , fetchHosts id
-            , fetchClips selfClipCount id
             ]
           Nothing ->
             case mlogin of
@@ -122,11 +121,11 @@ update msg model =
     Loaded mstate ->
       ( ( case mstate of
           Just state ->
-            { model
-            | exclusions = state.exclusions
-            , durations = Dict.fromList state.durations
-            , clipCache = state.clipCache
-            }
+            resolveLoaded { model
+              | exclusions = state.exclusions
+              , durations = Dict.fromList state.durations
+              , clipCache = state.clipCache
+              }
           Nothing ->
             model
         )
@@ -350,6 +349,28 @@ saveState model =
     |> Persist.Encode.persist
     |> Json.Encode.encode 0
     |> Harbor.save
+
+resolveLoaded : Model -> Model
+resolveLoaded model =
+  let
+    choices = case model.userId of
+      Just id ->
+        case Dict.get id model.clipCache of
+          Just (time, clips) -> importClips id model clips
+          Nothing -> []
+      Nothing -> []
+    requests = case model.userId of
+      Just id ->
+        if Dict.member id model.clipCache then
+          []
+        else
+          [fetchClips selfClipCount id]
+      Nothing -> []
+  in
+  { model
+  | clips = Array.append model.clips (Array.fromList choices)
+  , pendingRequests = List.append model.pendingRequests requests
+  }
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
