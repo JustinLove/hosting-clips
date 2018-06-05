@@ -178,7 +178,7 @@ update msg model =
       ( { model
         | hosts = hosts
         , clips = Array.append model.clips choices
-        , pendingRequests = model.pendingRequests |> appendRequests model.pendingRequests
+        , pendingRequests = model.pendingRequests |> appendRequests requests
         }
       , maybePickCommand model
       )

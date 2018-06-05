@@ -1,3 +1,5 @@
+- extra & in url
+
 - mature flag?
 
 ## CORS proxy
