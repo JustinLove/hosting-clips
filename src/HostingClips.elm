@@ -102,7 +102,7 @@ init location =
     , pendingRequests = [] |> appendRequests
       ( case (muserId, mlogin) of
           (Just id, Just login) -> [ fetchHosts id ]
-          (Just id, Nothing) -> [ fetchHosts id, fetchUserById id ] 
+          (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
           (Nothing, Just login) -> [ fetchUserByName login ]
           (Nothing, Nothing) -> [ Cmd.none ]
       )
