@@ -1,4 +1,3 @@
-- cache user lookup
 - mature flag?
 
 ## CORS proxy

@@ -100,15 +100,11 @@ init location =
     , thanks = NoHosts
     , exclusions = []
     , pendingRequests = [] |> appendRequests
-      (case muserId of
-          Just id ->
-            [ fetchUserById id
-            , fetchHosts id
-            ]
-          Nothing ->
-            case mlogin of
-              Just login -> [ fetchUserByName login ]
-              Nothing -> [ Cmd.none ]
+      ( case (muserId, mlogin) of
+          (Just id, Just login) -> [ fetchHosts id ]
+          (Just id, Nothing) -> [ fetchHosts id, fetchUserById id ] 
+          (Nothing, Just login) -> [ fetchUserByName login ]
+          (Nothing, Nothing) -> [ Cmd.none ]
       )
     , outstandingRequests = 0
     }
@@ -143,6 +139,11 @@ update msg model =
             [ Navigation.modifyUrl (createPath m2)
             , fetchHosts user.id
             , fetchClips selfClipCount user.id
+            ]
+        else if (Just user.login) /= model.login then
+          Cmd.batch
+            [ Navigation.modifyUrl (createPath m2)
+            , pickCommand m2
             ]
         else
           pickCommand m2
@@ -179,7 +180,7 @@ update msg model =
         , clips = Array.append model.clips choices
         , pendingRequests = model.pendingRequests |> appendRequests model.pendingRequests
         }
-      , Cmd.none
+      , maybePickCommand model
       )
     Hosts (Err error) ->
       let _ = Debug.log "hosts fetch error" error in
@@ -408,7 +409,7 @@ receiveLoaded mstring =
 
 maybePickCommand : Model -> Cmd Msg
 maybePickCommand model =
-  if Array.isEmpty model.clips then
+  if Array.isEmpty model.clips || model.thanks == NoHosts then
     pickCommand model
   else
     Cmd.none
@@ -551,12 +552,12 @@ extractSearchArgument key location =
 createQueryString : Model -> String
 createQueryString model =
   String.join "&"
-    [ (case model.userId of
+    [ case model.userId of
         Just id -> "userId=" ++ id
-        Nothing -> (case model.login of
-          Just name -> "login=" ++ name
-          Nothing -> "")
-      )
+        Nothing -> ""
+    , case model.login of
+        Just name -> "login=" ++ name
+        Nothing -> ""
     , if model.showClip == False then
         "showClip=false"
       else 
