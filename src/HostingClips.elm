@@ -146,7 +146,7 @@ update msg model =
             , fetchClips selfClipCount user.id
             ]
         else
-          Cmd.none
+          pickCommand m2
       )
     User (Ok _) ->
       let _ = Debug.log "user did not find that login name" "" in
