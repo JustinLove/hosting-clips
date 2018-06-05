@@ -551,22 +551,23 @@ extractSearchArgument key location =
 
 createQueryString : Model -> String
 createQueryString model =
-  String.join "&"
-    [ case model.userId of
-        Just id -> "userId=" ++ id
-        Nothing -> ""
-    , case model.login of
-        Just name -> "login=" ++ name
-        Nothing -> ""
-    , if model.showClip == False then
-        "showClip=false"
-      else 
-        ""
-    , if model.hostLimit < requestLimit then
-        "hostLimit=" ++ (toString model.hostLimit)
-      else
-        ""
-    ]
+  [ case model.userId of
+      Just id -> "userId=" ++ id
+      Nothing -> ""
+  , case model.login of
+      Just name -> "login=" ++ name
+      Nothing -> ""
+  , if model.showClip == False then
+      "showClip=false"
+    else 
+      ""
+  , if model.hostLimit < requestLimit then
+      "hostLimit=" ++ (toString model.hostLimit)
+    else
+      ""
+  ]
+    |> List.filter ((/=) "")
+    |> String.join "&"
 
 createPath : Model -> String
 createPath model =
