@@ -197,7 +197,7 @@ update msg model =
     Clips id (Ok twitchClips) ->
       let
         clips = twitchClips
-          |> List.map (myClip model.durations)
+          |> List.map myClip
         choices = importClips id model clips |> Array.fromList
         m2 =
           { model
@@ -332,6 +332,7 @@ importClips id model clips=
   else
     clips
       |> List.filter (notExcluded model.exclusions)
+      |> List.map (updateDuration model.durations)
       |> List.map (\clip ->
           if (Just id) == model.userId then
             SelfClip clip
@@ -508,14 +509,18 @@ fetchHosts id =
     , withCredentials = False
     }
 
-myClip : Dict String Time -> Helix.Clip -> Clip
-myClip durations clip =
+myClip : Helix.Clip -> Clip
+myClip clip =
   { id = clip.id
   , url = clip.url
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
-  , duration = Dict.get clip.id durations
+  , duration = Nothing
   }
+
+updateDuration : Dict String Time -> Clip -> Clip
+updateDuration durations clip =
+  { clip | duration = Dict.get clip.id durations }
 
 myHost : Tmi.Host -> Host
 myHost host =
