@@ -159,16 +159,7 @@ update msg model =
         hosts = List.map myHost twitchHosts
         (cached, new) = hosts
           |> List.take model.hostLimit
-          |> List.filter (\{hostDisplayName} ->
-            not <| Array.foldl (\choice found ->
-              found ||
-              case choice of
-                ThanksClip name _ -> name == hostDisplayName
-                Thanks name -> name == hostDisplayName
-                SelfClip _ -> False
-                NoHosts -> False
-              ) False model.clips
-            )
+          |> List.filter (\host -> List.all ((/=) host) model.hosts)
           |> List.partition (\{hostId} ->
               case Dict.get hostId model.clipCache of
                 Just (time, clips) -> time < (model.time - clipCycleTime)

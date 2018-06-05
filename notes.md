@@ -1,6 +1,5 @@
-- cache user lookup
-- use hosts intead of clips for host duplicate check
 - skip Cmd.none in queue
+- cache user lookup
 - mature flag?
 
 ## CORS proxy
