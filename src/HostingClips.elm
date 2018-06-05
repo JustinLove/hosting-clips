@@ -99,7 +99,7 @@ init location =
     , clips = Array.empty
     , thanks = NoHosts
     , exclusions = []
-    , pendingRequests =
+    , pendingRequests = [] |> appendRequests
       (case muserId of
           Just id ->
             [ fetchUserById id
@@ -110,7 +110,6 @@ init location =
               Just login -> [ fetchUserByName login ]
               Nothing -> [ Cmd.none ]
       )
-      |> List.filter (\c -> c /= Cmd.none)
     , outstandingRequests = 0
     }
   , Task.perform WindowSize Window.size
@@ -178,7 +177,7 @@ update msg model =
       ( { model
         | hosts = hosts
         , clips = Array.append model.clips choices
-        , pendingRequests = List.append model.pendingRequests requests
+        , pendingRequests = model.pendingRequests |> appendRequests model.pendingRequests
         }
       , Cmd.none
       )
@@ -244,7 +243,7 @@ update msg model =
       in
       ( { model
         | thanks = thanks
-        , pendingRequests = List.append
+        , pendingRequests = model.pendingRequests |> prependRequests
           [ case thanks of
               ThanksClip _ clip ->
                 if clip.duration == Nothing then
@@ -258,13 +257,12 @@ update msg model =
                   Cmd.none
               _ -> Cmd.none
           ]
-          model.pendingRequests
         }
       , Cmd.none
       )
     NextChoice time ->
       ( { model
-        | pendingRequests = List.append model.pendingRequests
+        | pendingRequests = model.pendingRequests |> appendRequests
           [ if model.hostLimit >= List.length model.hosts then
               case model.userId of
                 Just id -> fetchHosts id
@@ -293,8 +291,8 @@ update msg model =
       ( { model | windowWidth = size.width, windowHeight = size.height }, Cmd.none)
     UI (View.SetUsername username) ->
       ( { model
-        | pendingRequests =
-          List.append [fetchUserByName username] model.pendingRequests
+        | pendingRequests = model.pendingRequests |> prependRequests
+          [fetchUserByName username]
         }
       , Cmd.none)
     UI (View.Exclude id) ->
@@ -361,8 +359,16 @@ resolveLoaded model =
   in
   { model
   | clips = Array.append model.clips (Array.fromList choices)
-  , pendingRequests = List.append model.pendingRequests requests
+  , pendingRequests = model.pendingRequests |> appendRequests requests
   }
+
+appendRequests : List (Cmd msg) -> List (Cmd msg) -> List (Cmd msg)
+appendRequests requests pendingRequests =
+  List.filter ((/=) Cmd.none) <| List.append pendingRequests requests
+
+prependRequests : List (Cmd msg) -> List (Cmd msg) -> List (Cmd msg)
+prependRequests requests pendingRequests =
+  List.filter ((/=) Cmd.none) <| List.append requests pendingRequests
 
 subscriptions : Model -> Sub Msg
 subscriptions model =

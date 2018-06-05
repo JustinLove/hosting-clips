@@ -1,4 +1,3 @@
-- skip Cmd.none in queue
 - cache user lookup
 - mature flag?
 
