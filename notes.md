@@ -1,4 +1,7 @@
-- cacheing
+- cache user lookup
+- cache own clips requests
+- durations to cache loaded records
+- use hosts intead of clips for host duplicate check
 - mature flag?
 
 ## CORS proxy

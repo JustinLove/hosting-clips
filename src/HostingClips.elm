@@ -30,6 +30,7 @@ clipCycleTime = 60*Time.second
 noClipCycleTime = 10*Time.second
 selfClipCount = 100
 otherClipCount = 20
+clipCacheTime = 48 * 60 * 60 * Time.second
 
 type Msg
   = Loaded (Maybe Persist)
@@ -157,7 +158,7 @@ update msg model =
     Hosts (Ok twitchHosts) ->
       let
         hosts = List.map myHost twitchHosts
-        requests = hosts
+        (cached, new) = hosts
           |> List.take model.hostLimit
           |> List.filter (\{hostDisplayName} ->
             not <| Array.foldl (\choice found ->
@@ -169,10 +170,24 @@ update msg model =
                 NoHosts -> False
               ) False model.clips
             )
+          |> List.partition (\{hostId} ->
+              case Dict.get hostId model.clipCache of
+                Just (time, clips) -> time < (model.time - clipCycleTime)
+                Nothing -> False
+            )
+        requests = new
           |> List.map (\{hostId} -> fetchClips otherClipCount hostId)
+        choices = cached
+          |> List.concatMap (\{hostId} ->
+              case Dict.get hostId model.clipCache of
+                Just (time, clips) -> importClips hostId {model|hosts = hosts} clips
+                Nothing -> []
+              )
+          |> Array.fromList
       in
       ( { model
         | hosts = hosts
+        , clips = Array.append model.clips choices
         , pendingRequests = List.append model.pendingRequests requests
         }
       , Cmd.none
@@ -180,40 +195,15 @@ update msg model =
     Hosts (Err error) ->
       let _ = Debug.log "hosts fetch error" error in
       (model, Cmd.none)
-    Clips id (Ok []) ->
-      let
-       m2 = if (Just id) == model.userId then
-          { model
-          | clipCache = Dict.insert id (model.time, []) model.clipCache
-          }
-        else
-          { model
-          | clipCache = Dict.insert id (model.time, []) model.clipCache
-          , clips = Array.push
-            (Thanks (displayNameForHost model.hosts id))
-            model.clips
-          }
-      in
-      ( m2
-      , Cmd.batch [ saveState m2, maybePickCommand model ]
-      )
     Clips id (Ok twitchClips) ->
       let
         clips = twitchClips
           |> List.map (myClip model.durations)
-          |> List.filter (notExcluded model.exclusions)
-        new = clips
-          |> List.map (\clip ->
-              if (Just id) == model.userId then
-                SelfClip clip
-              else
-                ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
-          )
-        choices = Array.append model.clips (Array.fromList new)
+        choices = importClips id model clips |> Array.fromList
         m2 =
           { model
-          | clipCache = Dict.insert id (model.time, clips) model.clipCache
-          , clips = choices
+          | clips = Array.append model.clips choices
+          , clipCache = Dict.insert id (model.time, clips) model.clipCache
           }
       in
       ( m2
@@ -332,6 +322,23 @@ update msg model =
       in
       ( m2
       , Cmd.batch [ pickCommand model, saveState m2 ])
+
+importClips : String -> Model -> List Clip -> List Choice
+importClips id model clips=
+  if List.isEmpty clips then
+    if (Just id) == model.userId then
+      []
+    else
+      [Thanks (displayNameForHost model.hosts id)]
+  else
+    clips
+      |> List.filter (notExcluded model.exclusions)
+      |> List.map (\clip ->
+          if (Just id) == model.userId then
+            SelfClip clip
+          else
+            ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
+      )
 
 persist : Model -> (Model, Cmd Msg)
 persist model =
