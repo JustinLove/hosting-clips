@@ -12,6 +12,7 @@ import Json.Decode
 type Msg
   = SetUsername String
   | Exclude String
+  | ShowRecent
 
 type Choice
   = ThanksClip String Clip
@@ -68,12 +69,24 @@ body {
   flex-direction: column;
   justify-content: center;
 }
-.actions {
+.clip-actions {
   position: fixed;
   bottom: 0;
   right: 15em;
 }
-.actions button {
+.actions {
+  position: fixed;
+  bottom: 0;
+  right: 12em;
+}
+.actions ul {
+  position: absolute;
+  bottom: 1em;
+  right: 0;
+  width: 30em;
+  list-style-type: none;
+}
+.actions button, .clip-actions button {
   background-color: rgb(23, 20, 31);
   color: rgb(218, 216, 222);
   border: none;
@@ -110,7 +123,7 @@ view model =
                 displayClip model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
-            , displayActions clip
+            , displayClipActions clip
             ]
         Thanks name ->
           div [ class "host no-clip" ]
@@ -128,7 +141,7 @@ view model =
                 displayClip model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
-            , displayActions clip
+            , displayClipActions clip
             ]
         NoHosts ->
           div [ class "no-hosts" ]
@@ -141,6 +154,7 @@ view model =
                   Nothing -> displayNameEntryBox model.login
             ]
     , displayFooter
+    , displayActions model
     ]
 
 displayName : String -> Html msg
@@ -179,11 +193,39 @@ displayClip width height clip =
       ] []
     ]
 
-displayActions : Clip -> Html Msg
-displayActions clip =
-  div [ class "actions" ]
+displayClipActions : Clip -> Html Msg
+displayClipActions clip =
+  div [ class "clip-actions" ]
     [ button [ onClick (Exclude clip.id) ] [ text ("exclude " ++ clip.id) ]
     ]
+
+displayActions model =
+  div [ class "actions" ]
+    [ button [ onClick (ShowRecent) ] [ text "recent" ]
+    , if model.showingRecent then
+        model.recentClips
+          |> List.reverse
+          |> List.map displayRecentClip
+          |> ul [ class "recent-clips" ]
+      else
+        text ""
+    ]
+
+displayRecentClip : Choice -> Html Msg
+displayRecentClip choice =
+  case choice of
+    ThanksClip name clip ->
+      li []
+        [ button [ onClick (Exclude clip.id) ]
+          [ text ("exclude " ++ name ++ " " ++ clip.id) ]
+        ]
+    Thanks name -> text ""
+    SelfClip clip ->
+      li []
+        [ button [ onClick (Exclude clip.id) ]
+          [ text ("exclude your " ++ clip.id) ]
+        ]
+    NoHosts -> text ""
 
 displayFooter : Html msg
 displayFooter =

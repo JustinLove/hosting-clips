@@ -60,6 +60,8 @@ type alias Model =
   , clipCache : Dict String (Time, List Clip)
   , clips : Array Choice
   , thanks : Choice
+  , recentClips : List Choice
+  , showingRecent : Bool
   , exclusions : List String
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
@@ -98,6 +100,8 @@ init location =
     , clipCache = Dict.empty
     , clips = Array.empty
     , thanks = NoHosts
+    , recentClips = []
+    , showingRecent = False
     , exclusions = []
     , pendingRequests = [] |> appendRequests
       ( case (muserId, mlogin) of
@@ -244,6 +248,7 @@ update msg model =
       in
       ( { model
         | thanks = thanks
+        , recentClips = thanks :: model.recentClips
         , pendingRequests = model.pendingRequests |> prependRequests
           [ case thanks of
               ThanksClip _ clip ->
@@ -311,6 +316,8 @@ update msg model =
       in
       ( m2
       , Cmd.batch [ pickCommand model, saveState m2 ])
+    UI (View.ShowRecent) ->
+      ({ model | showingRecent = not model.showingRecent }, Cmd.none)
 
 importClips : String -> Model -> List Clip -> List Choice
 importClips id model clips=
