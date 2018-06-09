@@ -6,6 +6,7 @@ Displays random clips from people hosting you on Twitch.
 
 - login : Twitch username of the channel to check hosts for. (Exactly one of login or userId is required.)
 - userId : Twitch user id of the channel to check hosts for.
+- selfRate : Tweak the amount the channel's own clips are shown. 2 is twice as much, 0.5 is half and so on. Always relative to number of hosts.
 
 ### Debugging Parameters
 

@@ -54,6 +54,7 @@ type alias Model =
   , login : Maybe String
   , userId : Maybe String
   , showClip : Bool
+  , selfRate : Float
   , hostLimit : Int
   , hosts : List Host
   , durations : Dict String Time
@@ -80,6 +81,7 @@ init location =
     mlogin = extractSearchArgument "login" location
     muserId = extractSearchArgument "userId" location
     mshowClip = extractSearchArgument "showClip" location
+    mselfRate = extractSearchArgument "selfRate" location
     mhostLimit = extractSearchArgument "hostLimit" location
   in
   ( { location = location
@@ -91,6 +93,10 @@ init location =
     , showClip = case Maybe.withDefault "true" mshowClip of
         "false" -> False
         _ -> True
+    , selfRate = mselfRate
+      |> Maybe.map String.toFloat
+      |> Maybe.withDefault (Err "unspecified")
+      |> Result.withDefault 1.0
     , hostLimit = mhostLimit
       |> Maybe.map String.toInt
       |> Maybe.withDefault (Err "unspecified")
@@ -425,8 +431,8 @@ pickCommand : Model -> Cmd Msg
 pickCommand model = 
   Random.generate Pick
     <| Random.map2 (,)
-      (Random.int 0 (List.length model.hosts)
-        |> Random.map (\i -> i == 0)
+      (Random.float 0 ((List.length model.hosts |> toFloat) / model.selfRate)
+        |> Random.map (\i -> i < 1)
       )
       (Random.float 0 1)
 
@@ -567,6 +573,10 @@ createQueryString model =
   , if model.showClip == False then
       "showClip=false"
     else 
+      ""
+  , if model.selfRate /= 0.0 then
+      "selfRate=" ++ (toString model.selfRate)
+    else
       ""
   , if model.hostLimit < requestLimit then
       "hostLimit=" ++ (toString model.hostLimit)
