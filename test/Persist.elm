@@ -9,6 +9,7 @@ import Runner exposing (runAll)
 import Html exposing (Html)
 import Json.Decode
 import Dict
+import Time
 
 main : Html msg
 main =
@@ -33,7 +34,7 @@ all = describe "serialization"
       [ ("clip id", 1) ]
       ( Dict.fromList
         [ ("host id",
-            (1,
+            (Time.millisToPosix 1,
               [
                 { id = "clip id"
                 , url = "url"
