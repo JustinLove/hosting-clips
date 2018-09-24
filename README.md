@@ -17,11 +17,12 @@ Displays random clips from people hosting you on Twitch.
 
 - Currently have no way to determine channel mature flag
 - The hosting API is not part of the official Twitch API and requires a CORS proxy. Currently using [https://cors-proxy.htmldriven.com/]
+
 ## Compiling
 
 Built using [Elm](http://elm-lang.org/)
 
-A [Twitch Client-ID](https://dev.twitch.tv/docs/authentication#registration) is required to make API calls. This is defined in `src/TwtichId.elm`. This file is not part of of the repo, but `src/TwitchId.elm.example` can be copied and edited to provide your client id.
+A [Twitch Client-ID](https://dev.twitch.tv/docs/authentication#registration) is required to make API calls. This is defined in `src/TwitchId.elm`. This file is not part of of the repo, but `src/TwitchId.elm.example` can be copied and edited to provide your client id.
 
 My build command:
 
