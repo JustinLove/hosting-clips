@@ -25,6 +25,7 @@ import Array exposing (Array)
 import Random
 import Task
 import Url exposing (Url)
+import Url.Builder as Url
 import Url.Parser
 import Url.Parser.Query
 
@@ -571,30 +572,25 @@ extractSearchArgument key location =
     |> Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string key))
     |> Maybe.withDefault Nothing
 
-createQueryString : Model -> String
+createQueryString : Model -> List Url.QueryParameter
 createQueryString model =
-  [ case model.userId of
-      Just id -> "userId=" ++ id
-      Nothing -> ""
-  , case model.login of
-      Just name -> "login=" ++ name
-      Nothing -> ""
+  [ Maybe.map (Url.string "userId") model.userId
+  , Maybe.map (Url.string "login") model.login
   , if model.showClip == False then
-      "showClip=false"
+      Just <| Url.string "showClip" "false"
     else 
-      ""
+      Nothing
   , if model.selfRate /= 0.0 then
-      "selfRate=" ++ (String.fromFloat model.selfRate)
+      Just <| Url.string "selfRate" (String.fromFloat model.selfRate)
     else
-      ""
+      Nothing
   , if model.hostLimit < requestLimit then
-      "hostLimit=" ++ (String.fromInt model.hostLimit)
+      Just <| Url.int "hostLimit" model.hostLimit
     else
-      ""
+    Nothing
   ]
-    |> List.filter ((/=) "")
-    |> String.join "&"
+    |> List.filterMap identity
 
 createPath : Model -> String
 createPath model =
-  model.location.path ++ "?" ++ (createQueryString model)
+  Url.relative [] (createQueryString model)
