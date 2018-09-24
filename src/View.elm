@@ -175,8 +175,8 @@ displayClip width height clip =
   div []
     [ div
       [ class "clip-url"
-      --, style "height" ((String.fromFloat ((toFloat height) * 0.1)) ++ "px ")
-      --, style "margin-bottom" ((String.fromFloat ((toFloat height) * -0.1)) ++ "px ")
+      , style "height" ((String.fromFloat ((toFloat height) * 0.1)) ++ "px ")
+      , style "margin-bottom" ((String.fromFloat ((toFloat height) * -0.1)) ++ "px ")
       ]
       [ a [ href clip.url ] [ text clip.url ] ]
     , iframe
@@ -187,12 +187,10 @@ displayClip width height clip =
       , attribute "height" (String.fromFloat ((toFloat height) * 0.8))
       , attribute "scrolling" "no"
       , attribute "frameborder" "0"
-      {-, style
-        ("padding"
+      , style
+          "padding"
           ((String.fromFloat ((toFloat height) * 0.1)) ++ "px " ++
           (String.fromFloat ((toFloat width) * 0.1)) ++ "px")
-        )
-        -}
       ] []
     ]
 
