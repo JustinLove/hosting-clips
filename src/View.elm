@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Choice(..), Host, view)
+module View exposing (Msg(..), Choice(..), Host, view, document)
 
 import Persist exposing (Clip)
 
@@ -112,6 +112,11 @@ a:link, a:visited { color: #b19dd8; }
 a:hover, a:active { color: rgb(218, 216, 222); }
 """
 
+document tagger model =
+  { title = "Hosting Clips"
+  , body = [Html.map tagger (view model)]
+  }
+
 view model = 
   div [ class "view" ]
     [ node "style" [] [ text css ]
@@ -170,26 +175,24 @@ displayClip width height clip =
   div []
     [ div
       [ class "clip-url"
-      , style
-        [ ("height", (toString ((toFloat height) * 0.1)) ++ "px ")
-        , ("margin-bottom", (toString ((toFloat height) * -0.1)) ++ "px ")
-        ]
+      --, style "height" ((String.fromFloat ((toFloat height) * 0.1)) ++ "px ")
+      --, style "margin-bottom" ((String.fromFloat ((toFloat height) * -0.1)) ++ "px ")
       ]
       [ a [ href clip.url ] [ text clip.url ] ]
     , iframe
       [ src clip.embedUrl
       , sandbox "allow-scripts allow-same-origin"
       , attribute "allow" "autoplay"
-      , attribute "width" (toString ((toFloat width) * 0.8))
-      , attribute "height" (toString ((toFloat height) * 0.8))
+      , attribute "width" (String.fromFloat ((toFloat width) * 0.8))
+      , attribute "height" (String.fromFloat ((toFloat height) * 0.8))
       , attribute "scrolling" "no"
       , attribute "frameborder" "0"
-      , style
-        [ ("padding",
-            (toString ((toFloat height) * 0.1)) ++ "px " ++
-            (toString ((toFloat width) * 0.1)) ++ "px"
-          )
-        ]
+      {-, style
+        ("padding"
+          ((String.fromFloat ((toFloat height) * 0.1)) ++ "px " ++
+          (String.fromFloat ((toFloat width) * 0.1)) ++ "px")
+        )
+        -}
       ] []
     ]
 
@@ -258,7 +261,6 @@ icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
     [ use [ xlinkHref ("#icon-"++name) ] [] ]
-
 
 targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
 targetValue decoder tagger =

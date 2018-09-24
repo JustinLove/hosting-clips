@@ -1,6 +1,6 @@
 module HostingClips exposing (..)
 
-import Persist exposing (Persist, Clip)
+import Persist exposing (Persist, Clip, DurationInMilliseconds)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Decode as Helix
@@ -12,25 +12,28 @@ import View exposing (Choice(..), Host)
 import Harbor
 
 import Html
-import Navigation exposing (Location)
+import Browser
+import Browser.Dom as Dom
+import Browser.Events
+import Browser.Navigation as Navigation
 import Http
-import Time exposing (Time)
+import Time exposing (Posix)
 import Dict exposing (Dict)
 import Json.Decode
 import Json.Encode
 import Array exposing (Array)
 import Random
 import Task
-import Window
+import Url exposing (Url)
 
 requestLimit = 100
 rateLimit = 30
-requestRate = 60*Time.second/rateLimit
-clipCycleTime = 60*Time.second
-noClipCycleTime = 10*Time.second
+requestRate = 60*1000/rateLimit
+clipCycleTime = 60*1000
+noClipCycleTime = 10*1000
 selfClipCount = 100
 otherClipCount = 20
-clipCacheTime = 48 * 60 * 60 * Time.second
+clipCacheTime = 48 * 60 * 60 * 1000
 
 type Msg
   = Loaded (Maybe Persist)
@@ -39,26 +42,28 @@ type Msg
   | Clips String (Result Http.Error (List Helix.Clip))
   | ClipDetails (Result Http.Error ClipsV2.Clip)
   | Pick (Bool, Float)
-  | NextChoice Time
+  | NextChoice Posix
   | Response Msg
-  | NextRequest Time
-  | CurrentUrl Location
-  | WindowSize Window.Size
+  | NextRequest Posix
+  | CurrentUrl Url
+  | Navigate Browser.UrlRequest
+  | WindowSize (Int, Int)
   | UI (View.Msg)
 
 type alias Model =
-  { location : Location
+  { location : Url
+  , navigationKey : Navigation.Key
   , windowWidth : Int
   , windowHeight : Int
-  , time : Time
+  , time : Posix
   , login : Maybe String
   , userId : Maybe String
   , showClip : Bool
   , selfRate : Float
   , hostLimit : Int
   , hosts : List Host
-  , durations : Dict String Time
-  , clipCache : Dict String (Time, List Clip)
+  , durations : Dict String DurationInMilliseconds
+  , clipCache : Dict String (Posix, List Clip)
   , clips : Array Choice
   , thanks : Choice
   , recentClips : List Choice
@@ -68,15 +73,17 @@ type alias Model =
   , outstandingRequests : Int
   }
 
-main = Navigation.program CurrentUrl
+main = Browser.application
   { init = init
+  , view = View.document UI
   , update = update
   , subscriptions = subscriptions
-  , view = (\model -> Html.map UI (View.view model))
+  , onUrlRequest = Navigate
+  , onUrlChange = CurrentUrl
   }
 
-init : Location -> (Model, Cmd Msg)
-init location =
+init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
+init flags location key =
   let
     mlogin = extractSearchArgument "login" location
     muserId = extractSearchArgument "userId" location
@@ -85,22 +92,21 @@ init location =
     mhostLimit = extractSearchArgument "hostLimit" location
   in
   ( { location = location
+    , navigationKey = key
     , windowWidth = 852
     , windowHeight = 480
-    , time = 0
+    , time = Time.millisToPosix 0
     , login = mlogin
     , userId = muserId
     , showClip = case Maybe.withDefault "true" mshowClip of
         "false" -> False
         _ -> True
     , selfRate = mselfRate
-      |> Maybe.map String.toFloat
-      |> Maybe.withDefault (Err "unspecified")
-      |> Result.withDefault 1.0
+      |> Maybe.andThen String.toFloat
+      |> Maybe.withDefault 1.0
     , hostLimit = mhostLimit
-      |> Maybe.map String.toInt
-      |> Maybe.withDefault (Err "unspecified")
-      |> Result.withDefault requestLimit
+      |> Maybe.andThen String.toInt
+      |> Maybe.withDefault requestLimit
     , hosts = []
     , durations = Dict.empty
     , clipCache = Dict.empty
@@ -118,7 +124,9 @@ init location =
       )
     , outstandingRequests = 0
     }
-  , Task.perform WindowSize Window.size
+  , Dom.getViewport
+    |> Task.map (\viewport -> (round viewport.viewport.width, round viewport.viewport.height))
+    |> Task.perform WindowSize
   )
 
 update msg model =
@@ -137,22 +145,23 @@ update msg model =
       , Cmd.none
       )
     User (Ok (user::_)) ->
-      let m2 =
-        { model
-        | login = Just user.login
-        , userId = Just user.id
-        }
+      let
+        m2 =
+          { model
+          | login = Just user.login
+          , userId = Just user.id
+          }
       in
       ( m2
       , if (Just user.id) /= model.userId then
           Cmd.batch
-            [ Navigation.modifyUrl (createPath m2)
+            [ Navigation.pushUrl m2.navigationKey (createPath m2)
             , fetchHosts user.id
             , fetchClips selfClipCount user.id
             ]
         else if (Just user.login) /= model.login then
           Cmd.batch
-            [ Navigation.modifyUrl (createPath m2)
+            [ Navigation.pushUrl m2.navigationKey (createPath m2)
             , pickCommand m2
             ]
         else
@@ -172,7 +181,7 @@ update msg model =
           |> List.filter (\host -> List.all ((/=) host) model.hosts)
           |> List.partition (\{hostId} ->
               case Dict.get hostId model.clipCache of
-                Just (time, clips) -> time < (model.time - clipCycleTime)
+                Just (time, clips) -> (Time.posixToMillis time) < ((Time.posixToMillis model.time) - clipCycleTime)
                 Nothing -> False
             )
         requests = new
@@ -214,8 +223,8 @@ update msg model =
       (model, Cmd.none)
     ClipDetails (Ok twitchClip) ->
       let
-        duration = twitchClip.duration * Time.second
-        updateDuration choice =
+        duration = round (twitchClip.duration * 1000)
+        updateChoiceDuration choice =
           case choice of
             ThanksClip name clip ->
               if clip.id == twitchClip.slug then
@@ -231,8 +240,8 @@ update msg model =
       in
       persist <|
         { model
-        | thanks = updateDuration model.thanks
-        , clips = Array.map updateDuration model.clips
+        | thanks = updateChoiceDuration model.thanks
+        , clips = Array.map updateChoiceDuration model.clips
         , durations = Dict.insert twitchClip.slug duration model.durations
         }
     ClipDetails (Err error) ->
@@ -299,8 +308,14 @@ update msg model =
         _ -> ({model | time = time}, Cmd.none)
     CurrentUrl location ->
       ( { model | location = location }, Cmd.none)
-    WindowSize size ->
-      ( { model | windowWidth = size.width, windowHeight = size.height }, Cmd.none)
+    Navigate (Browser.Internal url) ->
+      ( {model | location = url}
+      , Navigation.pushUrl model.navigationKey (Url.toString url)
+      )
+    Navigate (Browser.External url) ->
+      (model, Navigation.load url)
+    WindowSize (width, height) ->
+      ( { model | windowWidth = width, windowHeight = height }, Cmd.none)
     UI (View.SetUsername username) ->
       ( { model
         | pendingRequests = model.pendingRequests |> prependRequests
@@ -308,17 +323,18 @@ update msg model =
         }
       , Cmd.none)
     UI (View.Exclude id) ->
-      let m2 =
-        { model
-        | exclusions = id :: model.exclusions
-        , clips = model.clips
-          |> Array.filter (\choice ->
-            case choice of
-              ThanksClip _ clip -> notExcluded model.exclusions clip
-              SelfClip clip -> notExcluded model.exclusions clip
-              _ -> True
-            )
-        }
+      let
+        m2 =
+          { model
+          | exclusions = id :: model.exclusions
+          , clips = model.clips
+            |> Array.filter (\choice ->
+              case choice of
+                ThanksClip _ clip -> notExcluded model.exclusions clip
+                SelfClip clip -> notExcluded model.exclusions clip
+                _ -> True
+              )
+          }
       in
       ( m2
       , Cmd.batch [ pickCommand model, saveState m2 ])
@@ -335,7 +351,7 @@ importClips id model clips=
   else
     clips
       |> List.filter (notExcluded model.exclusions)
-      |> List.map (updateDuration model.durations)
+      |> List.map (updateClipDuration model.durations)
       |> List.map (\clip ->
           if (Just id) == model.userId then
             SelfClip clip
@@ -397,16 +413,16 @@ subscriptions model =
         case model.thanks of
           ThanksClip _ {duration} ->
             Time.every
-              (duration |> Maybe.withDefault clipCycleTime)
+              (duration |> Maybe.withDefault clipCycleTime |> toFloat)
               NextChoice
           SelfClip {duration} ->
             Time.every
-              (duration |> Maybe.withDefault clipCycleTime)
+              (duration |> Maybe.withDefault clipCycleTime |> toFloat)
               NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
     , Harbor.loaded receiveLoaded
-    , Window.resizes WindowSize
+    , Browser.Events.onResize (\w h -> WindowSize (w, h))
     ]
 
 receiveLoaded : Maybe String -> Msg
@@ -430,7 +446,7 @@ maybePickCommand model =
 pickCommand : Model -> Cmd Msg
 pickCommand model = 
   Random.generate Pick
-    <| Random.map2 (,)
+    <| Random.map2 Tuple.pair
       (Random.float 0 ((List.length model.hosts |> toFloat) / model.selfRate)
         |> Random.map (\i -> i < 1)
       )
@@ -476,7 +492,7 @@ fetchUserById id =
 
 fetchClipsUrl : Int -> String -> String
 fetchClipsUrl count id =
-  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (toString count)
+  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (String.fromInt count)
 
 fetchClips : Int -> String -> Cmd Msg
 fetchClips count id =
@@ -529,8 +545,8 @@ myClip clip =
   , duration = Nothing
   }
 
-updateDuration : Dict String Time -> Clip -> Clip
-updateDuration durations clip =
+updateClipDuration : Dict String DurationInMilliseconds -> Clip -> Clip
+updateClipDuration durations clip =
   { clip | duration = Dict.get clip.id durations }
 
 myHost : Tmi.Host -> Host
@@ -547,10 +563,10 @@ displayNameForHost hosts id =
     |> Maybe.map .hostDisplayName
     |> Maybe.withDefault "Oops, how did that happen?"
 
-extractSearchArgument : String -> Location -> Maybe String
+extractSearchArgument : String -> Url -> Maybe String
 extractSearchArgument key location =
-  location.search
-    |> String.dropLeft 1
+  location.query
+    |> Maybe.withDefault ""
     |> String.split "&"
     |> List.map (String.split "=")
     |> List.filter (\x -> case List.head x of
@@ -575,11 +591,11 @@ createQueryString model =
     else 
       ""
   , if model.selfRate /= 0.0 then
-      "selfRate=" ++ (toString model.selfRate)
+      "selfRate=" ++ (String.fromFloat model.selfRate)
     else
       ""
   , if model.hostLimit < requestLimit then
-      "hostLimit=" ++ (toString model.hostLimit)
+      "hostLimit=" ++ (String.fromInt model.hostLimit)
     else
       ""
   ]
@@ -588,4 +604,4 @@ createQueryString model =
 
 createPath : Model -> String
 createPath model =
-  model.location.pathname ++ "?" ++ (createQueryString model)
+  model.location.path ++ "?" ++ (createQueryString model)
