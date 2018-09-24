@@ -258,7 +258,7 @@ displayNameEntryBox login =
 icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
-    [ use [ xlinkHref ("#icon-"++name) ] [] ]
+    [ use [ xlinkHref ("symbol-defs.svg#icon-"++name) ] [] ]
 
 targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
 targetValue decoder tagger =
