@@ -1,5 +1,6 @@
 module HostingClips exposing (..)
 
+import LocalStorage
 import Persist exposing (Persist, Clip, DurationInMilliseconds)
 import Persist.Encode
 import Persist.Decode
@@ -9,7 +10,6 @@ import Twitch.ClipsV2.Decode as ClipsV2
 import Twitch.Helix as Helix
 import TwitchId
 import View exposing (Choice(..), Host)
-import Harbor
 
 import Html
 import Browser
@@ -370,8 +370,7 @@ saveState : Model -> Cmd Msg
 saveState model =
   Persist model.exclusions (Dict.toList model.durations) model.clipCache
     |> Persist.Encode.persist
-    |> Json.Encode.encode 0
-    |> Harbor.save
+    |> LocalStorage.saveJson
 
 resolveLoaded : Model -> Model
 resolveLoaded model =
@@ -424,20 +423,9 @@ subscriptions model =
               NextChoice
           Thanks _ -> Time.every noClipCycleTime NextChoice
           NoHosts -> Time.every clipCycleTime NextChoice
-    , Harbor.loaded receiveLoaded
+    , LocalStorage.loadedJson Persist.Decode.persist Loaded
     , Browser.Events.onResize (\w h -> WindowSize (w, h))
     ]
-
-receiveLoaded : Maybe String -> Msg
-receiveLoaded mstring =
-  mstring
-    |> Maybe.andThen (\string ->
-      string
-       |> Json.Decode.decodeString Persist.Decode.persist
-       |> Result.mapError (Debug.log "persist decode error")
-       |> Result.toMaybe
-      )
-    |> Loaded
 
 maybePickCommand : Model -> Cmd Msg
 maybePickCommand model =
