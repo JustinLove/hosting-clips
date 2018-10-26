@@ -5,7 +5,8 @@ import Persist exposing (Clip)
 import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (on, onClick)
+import Html.Events exposing (on, onClick, onCheck)
+import Set
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
 import Json.Decode
@@ -89,7 +90,23 @@ manageView model =
       |> Dict.values
       |> List.concatMap (\(_,clips) -> clips)
       |> List.sortBy (\clip -> clip.id)
-      |> List.map (\clip -> li [] [ text clip.id ])
+      |> List.map (\clip ->
+        let
+          tag = "exclude-"++clip.id
+          excluded = Set.member clip.id model.exclusions
+        in
+        li [ classList [ ("excluded", excluded) ] ]
+          [ input
+            [ type_ "checkbox"
+            , Html.Attributes.name tag
+            , id tag
+            , value "selected"
+            , onCheck (\_ -> Exclude clip.id)
+            , checked excluded
+            ] []
+          , label [ for tag ] [ text clip.id ]
+          ]
+        )
       |> ul []
     , displayFooter
     , displayActions model

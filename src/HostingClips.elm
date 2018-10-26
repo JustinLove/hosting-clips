@@ -24,6 +24,7 @@ import Json.Encode
 import Array exposing (Array)
 import Random
 import Task
+import Set exposing (Set)
 import Url exposing (Url)
 import Url.Builder as Url
 import Url.Parser
@@ -69,7 +70,7 @@ type alias Model =
   , clipCache : Dict String (Posix, List Clip)
   , clips : Array Choice
   , thanks : Choice
-  , exclusions : List String
+  , exclusions : Set String
   , recentClips : List Choice
   , showingRecent : Bool
   , showingManage : Bool
@@ -116,7 +117,7 @@ init flags location key =
     , clipCache = Dict.empty
     , clips = Array.empty
     , thanks = NoHosts
-    , exclusions = []
+    , exclusions = Set.empty
     , recentClips = []
     , showingRecent = False
     , showingManage = False
@@ -140,7 +141,7 @@ update msg model =
       ( ( case mstate of
           Just state ->
             resolveLoaded { model
-              | exclusions = state.exclusions
+              | exclusions = Set.fromList state.exclusions
               , durations = Dict.fromList state.durations
               , clipCache = state.clipCache
               }
@@ -328,21 +329,27 @@ update msg model =
         }
       , Cmd.none)
     UI (View.Exclude id) ->
-      let
-        m2 =
-          { model
-          | exclusions = id :: model.exclusions
-          , clips = model.clips
-            |> Array.filter (\choice ->
-              case choice of
-                ThanksClip _ clip -> notExcluded model.exclusions clip
-                SelfClip clip -> notExcluded model.exclusions clip
-                _ -> True
-              )
-          }
-      in
-      ( m2
-      , Cmd.batch [ pickCommand model, saveState m2 ])
+      if Set.member id model.exclusions then
+        { model
+        | exclusions = Set.remove id model.exclusions
+        }
+          |> persist
+      else
+        let
+          m2 =
+            { model
+            | exclusions = Set.insert id model.exclusions
+            , clips = model.clips
+              |> Array.filter (\choice ->
+                case choice of
+                  ThanksClip _ clip -> notExcluded model.exclusions clip
+                  SelfClip clip -> notExcluded model.exclusions clip
+                  _ -> True
+                )
+            }
+        in
+        ( m2
+        , Cmd.batch [ pickCommand model, saveState m2 ])
     UI (View.ShowRecent) ->
       ({ model | showingRecent = not model.showingRecent }, Cmd.none)
     UI (View.ShowManage) ->
@@ -372,9 +379,12 @@ persist model =
 
 saveState : Model -> Cmd Msg
 saveState model =
-  Persist model.exclusions (Dict.toList model.durations) model.clipCache
-    |> Persist.Encode.persist
-    |> LocalStorage.saveJson
+  Persist
+    (Set.toList model.exclusions)
+    (Dict.toList model.durations)
+    model.clipCache
+      |> Persist.Encode.persist
+      |> LocalStorage.saveJson
 
 resolveLoaded : Model -> Model
 resolveLoaded model =
@@ -453,9 +463,9 @@ isSelf choice =
     SelfClip _ -> True
     _ -> False
 
-notExcluded : List String -> Clip -> Bool
+notExcluded : Set String -> Clip -> Bool
 notExcluded exclusions clip =
-  not <| List.any (\ex -> clip.id == ex) exclusions
+  not <| Set.member clip.id exclusions
 
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =

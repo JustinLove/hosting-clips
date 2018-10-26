@@ -64,6 +64,9 @@ body {
   border: none;
   color: #8879a5;
 }
+.excluded label {
+  text-decoration: line-through;
+}
 footer {
   position: fixed;
   bottom: 0;
