@@ -25,93 +25,6 @@ type alias Host =
   , hostDisplayName : String
   }
 
-css = """
-html, head, body {
-  height: 100%;
-  margin: 0;
-}
-body {
-  background-color: rgb(23, 20, 31);
-  color: rgb(218, 216, 222);
-}
-.view {
-  height: 100%;
-  position: relative;
-}
-.host h1 {
-  background-color: #2c2541;
-  color: rgb(250, 249, 250);
-  margin: 0;
-  padding: 0.5em;
-  text-align: center;
-}
-.channel-name {
-  color: rgb(218, 216, 222);
-}
-.no-hosts {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 100%;
-}
-.no-hosts .thanks {
-  text-align: center;
-}
-.no-hosts .host-command {
-  text-align: center;
-}
-.no-hosts .name-entry {
-  text-align: center;
-}
-.clip-url {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.clip-actions {
-  position: fixed;
-  bottom: 0;
-  right: 15em;
-}
-.actions {
-  position: fixed;
-  bottom: 0;
-  right: 12em;
-}
-.actions ul {
-  position: absolute;
-  bottom: 1em;
-  right: 0;
-  width: 30em;
-  list-style-type: none;
-}
-.actions button, .clip-actions button {
-  background-color: rgb(23, 20, 31);
-  color: rgb(218, 216, 222);
-  border: none;
-  color: #8879a5;
-}
-footer {
-  position: fixed;
-  bottom: 0;
-}
-svg.icon {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.2em;
-  stroke-width: 0;
-  stroke: currentColor;
-  fill: currentColor;
-}
-.icon-github { color: #888; }
-.icon-twitter { color: #55acee; }
-.icon-twitch { color: #6441A4; }
-a:link, a:visited { color: #b19dd8; }
-a:hover, a:active { color: rgb(218, 216, 222); }
-"""
-
 document tagger model =
   { title = "Hosting Clips"
   , body = [Html.map tagger (view model)]
@@ -119,8 +32,7 @@ document tagger model =
 
 view model = 
   div [ class "view" ]
-    [ node "style" [] [ text css ]
-    , case model.thanks of
+    [ case model.thanks of
         ThanksClip name clip ->
           div [ class "host clip" ]
             [ displayName name
