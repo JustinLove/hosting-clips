@@ -28,6 +28,13 @@ type alias Host =
   , hostDisplayName : String
   }
 
+css = """
+body {
+  background-color: rgb(23, 20, 31);
+  color: rgb(218, 216, 222);
+}
+"""
+
 document tagger model =
   { title = "Hosting Clips"
   , body = [Html.map tagger (view model)]
@@ -41,7 +48,8 @@ view model =
 
 clipsView model = 
   div [ class "view" ]
-    [ case model.thanks of
+    [ node "style" [] [ text css ]
+    , case model.thanks of
         ThanksClip name clip ->
           div [ class "host clip" ]
             [ displayName name
