@@ -2,6 +2,7 @@ module View exposing (Msg(..), Choice(..), Host, view, document)
 
 import Persist exposing (Clip)
 
+import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on, onClick)
@@ -13,6 +14,7 @@ type Msg
   = SetUsername String
   | Exclude String
   | ShowRecent
+  | ShowManage
 
 type Choice
   = ThanksClip String Clip
@@ -30,7 +32,13 @@ document tagger model =
   , body = [Html.map tagger (view model)]
   }
 
-view model = 
+view model =
+  if model.showingManage then
+    manageView model
+  else
+    clipsView model
+
+clipsView model = 
   div [ class "view" ]
     [ case model.thanks of
         ThanksClip name clip ->
@@ -70,6 +78,19 @@ view model =
                   Just _ -> text ""
                   Nothing -> displayNameEntryBox model.login
             ]
+    , displayFooter
+    , displayActions model
+    ]
+
+manageView model = 
+  div [ class "view" ]
+    [ h2 [] [text "Manage"]
+    , model.clipCache
+      |> Dict.values
+      |> List.concatMap (\(_,clips) -> clips)
+      |> List.sortBy (\clip -> clip.id)
+      |> List.map (\clip -> li [] [ text clip.id ])
+      |> ul []
     , displayFooter
     , displayActions model
     ]
@@ -115,6 +136,7 @@ displayClipActions clip =
 displayActions model =
   div [ class "actions" ]
     [ button [ onClick (ShowRecent) ] [ text "recent" ]
+    , button [ onClick (ShowManage) ] [ text "manage" ]
     , if model.showingRecent then
         model.recentClips
           |> List.reverse

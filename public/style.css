@@ -49,7 +49,7 @@ body {
 .actions {
   position: fixed;
   bottom: 0;
-  right: 12em;
+  right: 9em;
 }
 .actions ul {
   position: absolute;

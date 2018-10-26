@@ -69,9 +69,10 @@ type alias Model =
   , clipCache : Dict String (Posix, List Clip)
   , clips : Array Choice
   , thanks : Choice
+  , exclusions : List String
   , recentClips : List Choice
   , showingRecent : Bool
-  , exclusions : List String
+  , showingManage : Bool
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -115,9 +116,10 @@ init flags location key =
     , clipCache = Dict.empty
     , clips = Array.empty
     , thanks = NoHosts
+    , exclusions = []
     , recentClips = []
     , showingRecent = False
-    , exclusions = []
+    , showingManage = False
     , pendingRequests = [] |> appendRequests
       ( case (muserId, mlogin) of
           (Just id, Just login) -> [ fetchHosts id ]
@@ -343,6 +345,8 @@ update msg model =
       , Cmd.batch [ pickCommand model, saveState m2 ])
     UI (View.ShowRecent) ->
       ({ model | showingRecent = not model.showingRecent }, Cmd.none)
+    UI (View.ShowManage) ->
+      ({ model | showingManage = not model.showingManage }, Cmd.none)
 
 importClips : String -> Model -> List Clip -> List Choice
 importClips id model clips=
