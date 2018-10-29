@@ -74,6 +74,7 @@ type alias Model =
   , recentClips : List Choice
   , showingRecent : Bool
   , showingManage : Bool
+  , clipFilter : String
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
   }
@@ -121,6 +122,7 @@ init flags location key =
     , recentClips = []
     , showingRecent = False
     , showingManage = False
+    , clipFilter = ""
     , pendingRequests = [] |> appendRequests
       ( case (muserId, mlogin) of
           (Just id, Just login) -> [ fetchHosts id ]
@@ -354,6 +356,9 @@ update msg model =
       ({ model | showingRecent = not model.showingRecent }, Cmd.none)
     UI (View.ShowManage) ->
       ({ model | showingManage = not model.showingManage }, Cmd.none)
+    UI (View.ClipFilter query) ->
+      ( { model | clipFilter = query }
+      , Cmd.none)
 
 importClips : String -> Model -> List Clip -> List Choice
 importClips id model clips=

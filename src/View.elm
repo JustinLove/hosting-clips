@@ -5,7 +5,7 @@ import Persist exposing (Clip)
 import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (on, onClick, onCheck)
+import Html.Events exposing (on, onClick, onCheck, onInput)
 import Set
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
@@ -16,6 +16,7 @@ type Msg
   | Exclude String
   | ShowRecent
   | ShowManage
+  | ClipFilter String
 
 type Choice
   = ThanksClip String Clip
@@ -93,10 +94,21 @@ clipsView model =
 
 manageView model = 
   div [ class "view" ]
-    [ h2 [] [text "Manage"]
+    [ h2 []
+      [ text "Manage "
+      , input
+        [ type_ "text"
+        , id "clipfilter"
+        , name "clipfilter"
+        , value model.clipFilter
+        , placeholder "filter"
+        , onInput ClipFilter
+        ] []
+      ]
     , model.clipCache
       |> Dict.values
       |> List.concatMap (\(_,clips) -> clips)
+      |> List.filter (\clip -> clip.id |> String.contains model.clipFilter)
       |> List.sortBy (\clip -> clip.id)
       |> List.map (\clip ->
         let
