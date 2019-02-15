@@ -42,7 +42,7 @@ clipCacheTime = 48 * 60 * 60 * 1000
 type Msg
   = Loaded (Maybe Persist)
   | User (Result Http.Error (List Helix.User))
-  | Hosts (Result Http.Error (List Tmi.Host))
+  | Hosts (Result Http.Error (List Tmi.HostingTarget))
   | Clips String (Result Http.Error (List Helix.Clip))
   | ClipDetails (Result Http.Error ClipsV2.Clip)
   | Pick (Bool, Float)
@@ -520,14 +520,14 @@ fetchClipUrl slug =
 
 fetchClip : String -> Cmd Msg
 fetchClip slug =
-  Http.send (Response << ClipDetails) <| Http.request
+  Http.request
     { method = "GET"
     , headers = []
     , url = fetchClipUrl slug
     , body = Http.emptyBody
-    , expect = Http.expectJson ClipsV2.clip
+    , expect = Http.expectJson (Response << ClipDetails) ClipsV2.clip
     , timeout = Nothing
-    , withCredentials = False
+    , tracker = Nothing
     }
 
 fetchHostsUrl : String -> String
@@ -536,14 +536,14 @@ fetchHostsUrl id =
 
 fetchHosts : String -> Cmd Msg
 fetchHosts id =
-  Http.send (Response << Hosts) <| Http.request
+  Http.request
     { method = "GET"
     , headers = []
     , url = fetchHostsUrl id
     , body = Http.emptyBody
-    , expect = Http.expectJson Tmi.hosts
+    , expect = Http.expectJson (Response << Hosts) Tmi.hostingTarget
     , timeout = Nothing
-    , withCredentials = False
+    , tracker = Nothing
     }
 
 myClip : Helix.Clip -> Clip
@@ -559,7 +559,7 @@ updateClipDuration : Dict String DurationInMilliseconds -> Clip -> Clip
 updateClipDuration durations clip =
   { clip | duration = Dict.get clip.id durations }
 
-myHost : Tmi.Host -> Host
+myHost : Tmi.HostingTarget -> Host
 myHost host =
   { hostId = host.hostId
   , hostDisplayName = host.hostDisplayName
