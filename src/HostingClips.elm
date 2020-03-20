@@ -41,10 +41,11 @@ clipCacheTime = 48 * 60 * 60 * 1000
 
 type Msg
   = Loaded (Maybe Persist)
-  | User (Result Http.Error (List Helix.User))
-  | Hosts (Result Http.Error (List Tmi.HostingTarget))
-  | Clips String (Result Http.Error (List Helix.Clip))
-  | ClipDetails (Result Http.Error ClipsV2.Clip)
+  | HttpError String Http.Error
+  | User (List Helix.User)
+  | Hosts (List Tmi.HostingTarget)
+  | Clips String (List Helix.Clip)
+  | ClipDetails ClipsV2.Clip
   | Pick (Bool, Float)
   | NextChoice Posix
   | Response Msg
@@ -128,6 +129,33 @@ init flags location key =
     ]
   )
 
+logout : Model -> Model
+logout model =
+  { location = model.location
+  , navigationKey = model.navigationKey
+  , windowWidth = model.windowWidth
+  , windowHeight = model.windowHeight
+  , time = model.time
+  , login = Nothing
+  , userId = Nothing
+  , auth = Nothing
+  , showClip = model.showClip
+  , selfRate = model.selfRate
+  , hostLimit = model.hostLimit
+  , hosts = []
+  , durations = Dict.empty
+  , clipCache = Dict.empty
+  , clips = Array.empty
+  , thanks = NoHosts
+  , exclusions = Set.empty
+  , recentClips = []
+  , showingRecent = False
+  , showingManage = False
+  , clipFilter = ""
+  , pendingRequests = []
+  , outstandingRequests = model.outstandingRequests
+  }
+
 update msg model =
   case msg of
     Loaded mstate ->
@@ -143,7 +171,13 @@ update msg model =
         )
       , Cmd.none
       )
-    User (Ok (user::_)) ->
+    HttpError source (Http.BadStatus 401) ->
+      let _ = Debug.log ("fetch auth error: " ++ source) "" in
+      (logout model, Cmd.none)
+    HttpError source (error) ->
+      let _ = Debug.log ("fetch error: " ++ source) error in
+      (model, Cmd.none)
+    User (user::_) ->
       let
         m2 =
           { model
@@ -170,13 +204,10 @@ update msg model =
         else
           pickCommand m2
       )
-    User (Ok _) ->
+    User _ ->
       let _ = Debug.log "user did not find that login name" "" in
       (model, Cmd.none)
-    User (Err error) ->
-      let _ = Debug.log "user fetch error" error in
-      (model, Cmd.none)
-    Hosts (Ok twitchHosts) ->
+    Hosts twitchHosts ->
       let
         hosts = List.map myHost twitchHosts
         (cached, new) = hosts
@@ -208,10 +239,7 @@ update msg model =
         }
       , maybePickCommand model
       )
-    Hosts (Err error) ->
-      let _ = Debug.log "hosts fetch error" error in
-      (model, Cmd.none)
-    Clips id (Ok twitchClips) ->
+    Clips id twitchClips ->
       let
         clips = twitchClips
           |> List.map myClip
@@ -225,10 +253,7 @@ update msg model =
       ( m2
       , Cmd.batch [ saveState m2, maybePickCommand model ]
       )
-    Clips id (Err error) ->
-      let _ = Debug.log "clip fetch error" error in
-      (model, Cmd.none)
-    ClipDetails (Ok twitchClip) ->
+    ClipDetails twitchClip ->
       let
         duration = round (twitchClip.duration * 1000)
         updateChoiceDuration choice =
@@ -251,9 +276,6 @@ update msg model =
         , clips = Array.map updateChoiceDuration model.clips
         , durations = Dict.insert twitchClip.slug duration model.durations
         }
-    ClipDetails (Err error) ->
-      let _ = Debug.log "clip detail fetch error" error in
-      (model, Cmd.none)
     Pick (self, selector) ->
       let
         selfClips = Array.filter isSelf model.clips
@@ -500,6 +522,12 @@ notExcluded : Set String -> Clip -> Bool
 notExcluded exclusions clip =
   not <| Set.member clip.id exclusions
 
+httpResponse : String -> (a -> Msg)-> Result Http.Error a -> Msg
+httpResponse source success result =
+  case result of
+    Ok value -> Response (success value)
+    Err err -> Response (HttpError source err)
+
 fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
   "https://api.twitch.tv/helix/users?login=" ++ login
@@ -510,7 +538,7 @@ fetchUserByName auth login =
     { clientId = TwitchId.clientId
     , auth = Just auth
     , decoder = Helix.users
-    , tagger = Response << User
+    , tagger = httpResponse "user by name" User
     , url = (fetchUserByNameUrl login)
     }
 
@@ -524,7 +552,7 @@ fetchUserById auth id =
     { clientId = TwitchId.clientId
     , auth = Just auth
     , decoder = Helix.users
-    , tagger = Response << User
+    , tagger = httpResponse "user by id" User
     , url = (fetchUserByIdUrl id)
     }
 
@@ -538,7 +566,7 @@ fetchSelf auth =
     { clientId = TwitchId.clientId
     , auth = Just auth
     , decoder = Helix.users
-    , tagger = Response << User
+    , tagger = httpResponse "self" User
     , url = fetchSelfUrl
     }
 
@@ -552,7 +580,7 @@ fetchClips auth count id =
     { clientId = TwitchId.clientId
     , auth = Just auth
     , decoder = Helix.clips
-    , tagger = Response << Clips id
+    , tagger = httpResponse "clips" (Clips id)
     , url = (fetchClipsUrl count id)
     }
 
@@ -567,7 +595,7 @@ fetchClip slug =
     , headers = []
     , url = fetchClipUrl slug
     , body = Http.emptyBody
-    , expect = Http.expectJson (Response << ClipDetails) ClipsV2.clip
+    , expect = Http.expectJson (httpResponse "clip details" ClipDetails) ClipsV2.clip
     , timeout = Nothing
     , tracker = Nothing
     }
@@ -583,7 +611,7 @@ fetchHosts id =
     , headers = []
     , url = fetchHostsUrl id
     , body = Http.emptyBody
-    , expect = Http.expectJson (Response << Hosts) Tmi.hostingTarget
+    , expect = Http.expectJson (httpResponse "hosts" Hosts) Tmi.hostingTarget
     , timeout = Nothing
     , tracker = Nothing
     }
