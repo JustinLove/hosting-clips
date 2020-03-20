@@ -153,11 +153,15 @@ update msg model =
       in
       ( m2
       , if (Just user.id) /= model.userId then
-          Cmd.batch
-            [ Navigation.pushUrl m2.navigationKey (createPath m2)
-            , fetchHosts user.id
-            , fetchClips selfClipCount user.id
-            ]
+          case model.auth of
+            Just auth ->
+              Cmd.batch
+                [ Navigation.pushUrl m2.navigationKey (createPath m2)
+                , fetchHosts user.id
+                , fetchClips auth selfClipCount user.id
+                ]
+            Nothing ->
+                Navigation.pushUrl m2.navigationKey (createPath m2)
         else if (Just user.login) /= model.login then
           Cmd.batch
             [ Navigation.pushUrl m2.navigationKey (createPath m2)
@@ -183,8 +187,12 @@ update msg model =
                 Just (time, clips) -> (Time.posixToMillis time) < ((Time.posixToMillis model.time) - clipCycleTime)
                 Nothing -> False
             )
-        requests = new
-          |> List.map (\{hostId} -> fetchClips otherClipCount hostId)
+        requests = case model.auth of
+          Just auth ->
+            new
+              |> List.map (\{hostId} -> fetchClips auth otherClipCount hostId)
+          Nothing ->
+            []
         choices = cached
           |> List.concatMap (\{hostId} ->
               case Dict.get hostId model.clipCache of
@@ -333,8 +341,8 @@ update msg model =
               Just auth ->
                 ( case (muserId, mlogin) of
                   (Just id, Just login) -> [ fetchHosts id ]
-                  (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
-                  (Nothing, Just login) -> [ fetchUserByName login ]
+                  (Just id, Nothing) -> [ fetchUserById auth id, fetchHosts id ] 
+                  (Nothing, Just login) -> [ fetchUserByName auth login ]
                   (Nothing, Nothing) -> [ fetchSelf auth ]
                 )
               Nothing ->
@@ -420,13 +428,13 @@ resolveLoaded model =
           Just (time, clips) -> importClips id model clips
           Nothing -> []
       Nothing -> []
-    requests = case model.userId of
-      Just id ->
+    requests = case (model.auth, model.userId) of
+      (Just auth, Just id) ->
         if Dict.member id model.clipCache then
           []
         else
-          [fetchClips selfClipCount id]
-      Nothing -> []
+          [fetchClips auth selfClipCount id]
+      _ -> []
   in
   { model
   | clips = Array.append model.clips (Array.fromList choices)
@@ -496,11 +504,11 @@ fetchUserByNameUrl : String -> String
 fetchUserByNameUrl login =
   "https://api.twitch.tv/helix/users?login=" ++ login
 
-fetchUserByName : String -> Cmd Msg
-fetchUserByName login =
+fetchUserByName : String -> String -> Cmd Msg
+fetchUserByName auth login =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Nothing
+    , auth = Just auth
     , decoder = Helix.users
     , tagger = Response << User
     , url = (fetchUserByNameUrl login)
@@ -510,11 +518,11 @@ fetchUserByIdUrl : String -> String
 fetchUserByIdUrl id =
   "https://api.twitch.tv/helix/users?id=" ++ id
 
-fetchUserById : String -> Cmd Msg
-fetchUserById id =
+fetchUserById : String -> String -> Cmd Msg
+fetchUserById auth id =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Nothing
+    , auth = Just auth
     , decoder = Helix.users
     , tagger = Response << User
     , url = (fetchUserByIdUrl id)
@@ -538,11 +546,11 @@ fetchClipsUrl : Int -> String -> String
 fetchClipsUrl count id =
   "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (String.fromInt count)
 
-fetchClips : Int -> String -> Cmd Msg
-fetchClips count id =
+fetchClips : String -> Int -> String -> Cmd Msg
+fetchClips auth count id =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Nothing
+    , auth = Just auth
     , decoder = Helix.clips
     , tagger = Response << Clips id
     , url = (fetchClipsUrl count id)

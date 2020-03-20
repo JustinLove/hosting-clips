@@ -1,4 +1,5 @@
 
+- update twitch api for required auth
 - 410 clip missing response https://clips.twitch.tv/api/v2/clips/ShakingRoundLarkDoggo
 - mature flag?
 
