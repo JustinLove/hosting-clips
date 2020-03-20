@@ -92,7 +92,7 @@ main = Browser.application
 init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
 init flags location key =
   let
-    (initialModel, _) =
+    (initialModel, initialCmd) =
       { location = location
       , navigationKey = key
       , windowWidth = 852
@@ -120,9 +120,12 @@ init flags location key =
         |> update (CurrentUrl location)
   in
   ( initialModel
-  , Dom.getViewport
-    |> Task.map (\viewport -> (round viewport.viewport.width, round viewport.viewport.height))
-    |> Task.perform WindowSize
+  , Cmd.batch
+    [ initialCmd
+    , Dom.getViewport
+      |> Task.map (\viewport -> (round viewport.viewport.width, round viewport.viewport.height))
+      |> Task.perform WindowSize
+    ]
   )
 
 update msg model =
@@ -311,7 +314,7 @@ update msg model =
         mhostLimit = extractSearchArgument "hostLimit" location
         mauth = extractHashArgument "access_token" location
       in
-      ( { model
+        { model
         | location = location
         , login = mlogin
         , userId = muserId
@@ -326,15 +329,19 @@ update msg model =
           |> Maybe.andThen String.toInt
           |> Maybe.withDefault requestLimit
         , pendingRequests = model.pendingRequests |> appendRequests
-          ( case (muserId, mlogin) of
-              (Just id, Just login) -> [ fetchHosts id ]
-              (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
-              (Nothing, Just login) -> [ fetchUserByName login ]
-              (Nothing, Nothing) -> [ Cmd.none ]
+          ( case mauth of
+              Just auth ->
+                ( case (muserId, mlogin) of
+                  (Just id, Just login) -> [ fetchHosts id ]
+                  (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
+                  (Nothing, Just login) -> [ fetchUserByName login ]
+                  (Nothing, Nothing) -> [ fetchSelf auth ]
+                )
+              Nothing ->
+                [ Cmd.none ]
           )
         }
-      , Cmd.none
-      )
+          |> update (NextRequest model.time)
     Navigate (Browser.Internal url) ->
       ( {model | location = url}
       , Navigation.pushUrl model.navigationKey (Url.toString url)
@@ -511,6 +518,20 @@ fetchUserById id =
     , decoder = Helix.users
     , tagger = Response << User
     , url = (fetchUserByIdUrl id)
+    }
+
+fetchSelfUrl : String
+fetchSelfUrl =
+  "https://api.twitch.tv/helix/users"
+
+fetchSelf : String -> Cmd Msg
+fetchSelf auth =
+  Helix.send <|
+    { clientId = TwitchId.clientId
+    , auth = Just auth
+    , decoder = Helix.users
+    , tagger = Response << User
+    , url = fetchSelfUrl
     }
 
 fetchClipsUrl : Int -> String -> String

@@ -221,13 +221,18 @@ displayLogin model =
   case model.auth of
     Just _ ->
       span [ ]
-        [ text <| Maybe.withDefault "--" model.login
+        [ text " "
+        , text <| Maybe.withDefault "--" model.login
+        , text " "
         , a [ href (Url.relative [] []) ]
             [ text "logout" ]
         ]
     Nothing ->
-      a [ href (authorizeUrl (urlForRedirect model.location)) ]
-        [ icon "twitch", text "login" ]
+      span []
+        [ text " "
+        , a [ href (authorizeUrl (urlForRedirect model.location)) ]
+            [ icon "twitch", text "login" ]
+        ]
 
 -- displayFooter : Model -> Html msg
 displayFooter model =
