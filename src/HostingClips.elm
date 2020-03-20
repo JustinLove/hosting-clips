@@ -62,6 +62,7 @@ type alias Model =
   , time : Posix
   , login : Maybe String
   , userId : Maybe String
+  , auth : Maybe String
   , showClip : Bool
   , selfRate : Float
   , hostLimit : Int
@@ -91,47 +92,34 @@ main = Browser.application
 init : () -> Url -> Navigation.Key -> (Model, Cmd Msg)
 init flags location key =
   let
-    mlogin = extractSearchArgument "login" location
-    muserId = extractSearchArgument "userId" location
-    mshowClip = extractSearchArgument "showClip" location
-    mselfRate = extractSearchArgument "selfRate" location
-    mhostLimit = extractSearchArgument "hostLimit" location
+    (initialModel, _) =
+      { location = location
+      , navigationKey = key
+      , windowWidth = 852
+      , windowHeight = 480
+      , time = Time.millisToPosix 0
+      , login = Nothing
+      , userId = Nothing
+      , auth = Nothing
+      , showClip = True
+      , selfRate = 1.0
+      , hostLimit = requestLimit
+      , hosts = []
+      , durations = Dict.empty
+      , clipCache = Dict.empty
+      , clips = Array.empty
+      , thanks = NoHosts
+      , exclusions = Set.empty
+      , recentClips = []
+      , showingRecent = False
+      , showingManage = False
+      , clipFilter = ""
+      , pendingRequests = []
+      , outstandingRequests = 0
+      }
+        |> update (CurrentUrl location)
   in
-  ( { location = location
-    , navigationKey = key
-    , windowWidth = 852
-    , windowHeight = 480
-    , time = Time.millisToPosix 0
-    , login = mlogin
-    , userId = muserId
-    , showClip = case Maybe.withDefault "true" mshowClip of
-        "false" -> False
-        _ -> True
-    , selfRate = mselfRate
-      |> Maybe.andThen String.toFloat
-      |> Maybe.withDefault 1.0
-    , hostLimit = mhostLimit
-      |> Maybe.andThen String.toInt
-      |> Maybe.withDefault requestLimit
-    , hosts = []
-    , durations = Dict.empty
-    , clipCache = Dict.empty
-    , clips = Array.empty
-    , thanks = NoHosts
-    , exclusions = Set.empty
-    , recentClips = []
-    , showingRecent = False
-    , showingManage = False
-    , clipFilter = ""
-    , pendingRequests = [] |> appendRequests
-      ( case (muserId, mlogin) of
-          (Just id, Just login) -> [ fetchHosts id ]
-          (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
-          (Nothing, Just login) -> [ fetchUserByName login ]
-          (Nothing, Nothing) -> [ Cmd.none ]
-      )
-    , outstandingRequests = 0
-    }
+  ( initialModel
   , Dom.getViewport
     |> Task.map (\viewport -> (round viewport.viewport.width, round viewport.viewport.height))
     |> Task.perform WindowSize
@@ -315,7 +303,37 @@ update msg model =
             }, next)
         _ -> ({model | time = time}, Cmd.none)
     CurrentUrl location ->
-      ( { model | location = location }, Cmd.none)
+      let
+        mlogin = extractSearchArgument "login" location
+        muserId = extractSearchArgument "userId" location
+        mshowClip = extractSearchArgument "showClip" location
+        mselfRate = extractSearchArgument "selfRate" location
+        mhostLimit = extractSearchArgument "hostLimit" location
+      in
+      ( { model
+        | location = location
+        , login = mlogin
+        , userId = muserId
+        , auth = Nothing
+        , showClip = case Maybe.withDefault "true" mshowClip of
+            "false" -> False
+            _ -> True
+        , selfRate = mselfRate
+          |> Maybe.andThen String.toFloat
+          |> Maybe.withDefault 1.0
+        , hostLimit = mhostLimit
+          |> Maybe.andThen String.toInt
+          |> Maybe.withDefault requestLimit
+        , pendingRequests = model.pendingRequests |> appendRequests
+          ( case (muserId, mlogin) of
+              (Just id, Just login) -> [ fetchHosts id ]
+              (Just id, Nothing) -> [ fetchUserById id, fetchHosts id ] 
+              (Nothing, Just login) -> [ fetchUserByName login ]
+              (Nothing, Nothing) -> [ Cmd.none ]
+          )
+        }
+      , Cmd.none
+      )
     Navigate (Browser.Internal url) ->
       ( {model | location = url}
       , Navigation.pushUrl model.navigationKey (Url.toString url)
