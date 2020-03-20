@@ -309,12 +309,13 @@ update msg model =
         mshowClip = extractSearchArgument "showClip" location
         mselfRate = extractSearchArgument "selfRate" location
         mhostLimit = extractSearchArgument "hostLimit" location
+        mauth = extractHashArgument "access_token" location
       in
       ( { model
         | location = location
         , login = mlogin
         , userId = muserId
-        , auth = Nothing
+        , auth = mauth
         , showClip = case Maybe.withDefault "true" mshowClip of
             "false" -> False
             _ -> True
@@ -342,12 +343,6 @@ update msg model =
       (model, Navigation.load url)
     WindowSize (width, height) ->
       ( { model | windowWidth = width, windowHeight = height }, Cmd.none)
-    UI (View.SetUsername username) ->
-      ( { model
-        | pendingRequests = model.pendingRequests |> prependRequests
-          [fetchUserByName username]
-        }
-      , Cmd.none)
     UI (View.Exclude id) ->
       if Set.member id model.exclusions then
         { model
@@ -597,6 +592,12 @@ extractSearchArgument key location =
     |> Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string key))
     |> Maybe.withDefault Nothing
 
+extractHashArgument : String -> Url -> Maybe String
+extractHashArgument key location =
+  { location | path = "", query = location.fragment }
+    |> Url.Parser.parse (Url.Parser.query (Url.Parser.Query.string key))
+    |> Maybe.withDefault Nothing
+
 createQueryString : Model -> List Url.QueryParameter
 createQueryString model =
   [ Maybe.map (Url.string "userId") model.userId
@@ -618,4 +619,4 @@ createQueryString model =
 
 createPath : Model -> String
 createPath model =
-  Url.relative [] (createQueryString model)
+  Url.custom Url.Relative [] (createQueryString model) (Maybe.map (\token -> "access_token=" ++ token) model.auth)

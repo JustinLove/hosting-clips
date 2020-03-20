@@ -1,6 +1,7 @@
 module View exposing (Msg(..), Choice(..), Host, view, document)
 
 import Persist exposing (Clip)
+import TwitchId
 
 import Dict
 import Html exposing (..)
@@ -10,10 +11,11 @@ import Set
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
 import Json.Decode
+import Url exposing (Url)
+import Url.Builder as Url
 
 type Msg
-  = SetUsername String
-  | Exclude String
+  = Exclude String
   | ShowRecent
   | ShowManage
   | ClipFilter String
@@ -84,11 +86,11 @@ clipsView model =
             , case model.login of
               Just name -> h2 [ class "host-command" ] [ text ("/host " ++ name) ]
               Nothing ->
-                case model.userId of
+                case model.auth of
                   Just _ -> text ""
-                  Nothing -> displayNameEntryBox model.login
+                  Nothing -> div [ class "login" ] [ displayLogin model ]
             ]
-    , displayFooter
+    , displayFooter model
     , displayActions model
     ]
 
@@ -128,7 +130,7 @@ manageView model =
           ]
         )
       |> ul []
-    , displayFooter
+    , displayFooter model
     , displayActions model
     ]
 
@@ -199,8 +201,36 @@ displayRecentClip choice =
         ]
     NoHosts -> text ""
 
-displayFooter : Html msg
-displayFooter =
+authorizeUrl : String -> String
+authorizeUrl redirectUri =
+  "https://id.twitch.tv/oauth2/authorize"
+    ++ (
+      [ Url.string "client_id" TwitchId.clientId
+      , Url.string "redirect_uri" redirectUri
+      , Url.string "response_type" "token"
+      , Url.string "scope" ""
+      ]
+      |> Url.toQuery
+      )
+
+urlForRedirect : Url -> String
+urlForRedirect url =
+  {url | query = Nothing, fragment = Nothing } |> Url.toString
+
+displayLogin model =
+  case model.auth of
+    Just _ ->
+      span [ ]
+        [ text <| Maybe.withDefault "--" model.login
+        , a [ href (Url.relative [] []) ]
+            [ text "logout" ]
+        ]
+    Nothing ->
+      a [ href (authorizeUrl (urlForRedirect model.location)) ]
+        [ icon "twitch", text "login" ]
+
+-- displayFooter : Model -> Html msg
+displayFooter model =
   footer []
     [ a [ href "https://github.com/JustinLove/hosting-clips" ]
       [ icon "github", text "hosting-clips" ]
@@ -210,28 +240,14 @@ displayFooter =
     , text " "
     , a [ href "https://twitch.tv/wondible" ]
       [ icon "twitch", text "wondible" ]
-    ]
-
-displayNameEntryBox : Maybe String -> Html Msg
-displayNameEntryBox login =
-  div [ class "name-entry" ]
-    [ label [ for "channelname" ] [ text "Channel Name" ]
-    , text " "
-    , input
-      [ type_ "text"
-      , id "channelname"
-      , name "channelname"
-      , placeholder (Maybe.withDefault "" login)
-      , on "change" <| targetValue Json.Decode.string SetUsername
-      ] []
+    , case model.auth of
+      Just _ ->
+        displayLogin model
+      Nothing ->
+        text ""
     ]
 
 icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
     [ use [ xlinkHref ("symbol-defs.svg#icon-"++name) ] [] ]
-
-targetValue : Json.Decode.Decoder a -> (a -> Msg) -> Json.Decode.Decoder Msg
-targetValue decoder tagger =
-  Json.Decode.map tagger
-    (Json.Decode.at ["target", "value" ] decoder)
