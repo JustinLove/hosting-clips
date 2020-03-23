@@ -19,6 +19,7 @@ type Msg
   | ShowRecent
   | ShowManage
   | ClipFilter String
+  | ClipDuration String Float
 
 type Choice
   = ThanksClip String Clip
@@ -61,6 +62,7 @@ clipsView model =
               else
                 text clip.embedUrl
             , displayClipActions clip
+            , measureClipDuration clip
             ]
         Thanks name ->
           div [ class "host no-clip" ]
@@ -79,6 +81,7 @@ clipsView model =
               else
                 text clip.embedUrl
             , displayClipActions clip
+            , measureClipDuration clip
             ]
         NoHosts ->
           div [ class "no-hosts" ]
@@ -165,6 +168,19 @@ displayClip width height clip =
           (String.fromFloat ((toFloat width) * 0.1)) ++ "px")
       ] []
     ]
+
+measureClipDuration : Clip -> Html Msg
+measureClipDuration clip =
+  case (clip.duration, clip.videoUrl) of
+    (Nothing, Just videoUrl) -> 
+      video
+        [ id "duration-probe"
+        , src videoUrl
+        , preload "metadata"
+        , on "loadedmetadata" (targetDuration (ClipDuration clip.id))
+        ] []
+    _ ->
+      text ""
 
 displayClipActions : Clip -> Html Msg
 displayClipActions clip =
@@ -256,3 +272,8 @@ icon : String -> Html msg
 icon name =
   svg [ Svg.Attributes.class ("icon icon-"++name) ]
     [ use [ xlinkHref ("symbol-defs.svg#icon-"++name) ] [] ]
+
+targetDuration : (Float -> Msg) -> Json.Decode.Decoder Msg
+targetDuration tagger =
+  Json.Decode.map tagger
+    (Json.Decode.at ["target", "duration" ] Json.Decode.float)

@@ -28,9 +28,13 @@ clipCache =
 
 clip : Clip -> Value
 clip c =
-  object
-    [ ("id", string c.id)
-    , ("url", string c.url)
-    , ("embedUrl", string c.embedUrl)
-    , ("broadcasterId", string c.broadcasterId)
-    ]
+  [ ("id", string c.id)
+  , ("url", string c.url)
+  , ("embedUrl", string c.embedUrl)
+  , ("broadcasterId", string c.broadcasterId)
+  ]
+    |> List.append (case c.videoUrl of
+      Just videoUrl -> [("videoUrl", string videoUrl)]
+      Nothing -> []
+    )
+    |> object

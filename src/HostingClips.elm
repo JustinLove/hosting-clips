@@ -5,9 +5,8 @@ import Persist exposing (Persist, Clip, DurationInMilliseconds)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Decode as Helix
-import Twitch.Tmi.Decode as Tmi
-import Twitch.ClipsV2.Decode as ClipsV2
 import Twitch.Helix as Helix
+import Twitch.Tmi.Decode as Tmi
 import TwitchId
 import View exposing (Choice(..), Host)
 
@@ -45,7 +44,6 @@ type Msg
   | User (List Helix.User)
   | Hosts (List Tmi.HostingTarget)
   | Clips String (List Helix.Clip)
-  | ClipDetails ClipsV2.Clip
   | Pick (Bool, Float)
   | NextChoice Posix
   | Response Msg
@@ -253,29 +251,6 @@ update msg model =
       ( m2
       , Cmd.batch [ saveState m2, maybePickCommand model ]
       )
-    ClipDetails twitchClip ->
-      let
-        duration = round (twitchClip.duration * 1000)
-        updateChoiceDuration choice =
-          case choice of
-            ThanksClip name clip ->
-              if clip.id == twitchClip.slug then
-                ThanksClip name {clip | duration = Just duration}
-              else 
-                choice
-            SelfClip clip ->
-              if clip.id == twitchClip.slug then
-                SelfClip {clip | duration = Just duration}
-              else 
-                choice
-            _ -> choice
-      in
-      persist <|
-        { model
-        | thanks = updateChoiceDuration model.thanks
-        , clips = Array.map updateChoiceDuration model.clips
-        , durations = Dict.insert twitchClip.slug duration model.durations
-        }
     Pick (self, selector) ->
       let
         selfClips = Array.filter isSelf model.clips
@@ -297,12 +272,12 @@ update msg model =
           [ case thanks of
               ThanksClip _ clip ->
                 if clip.duration == Nothing then
-                  fetchClip clip.id
+                  Cmd.none
                 else
                   Cmd.none
               SelfClip clip ->
                 if clip.duration == Nothing then
-                  fetchClip clip.id
+                  Cmd.none
                 else
                   Cmd.none
               _ -> Cmd.none
@@ -409,6 +384,30 @@ update msg model =
     UI (View.ClipFilter query) ->
       ( { model | clipFilter = query }
       , Cmd.none)
+    UI (View.ClipDuration id seconds) ->
+      --let _ = Debug.log id seconds in
+      let
+        duration = round (seconds * 1000)
+        updateChoiceDuration choice =
+          case choice of
+            ThanksClip name clip ->
+              if clip.id == id then
+                ThanksClip name {clip | duration = Just duration}
+              else 
+                choice
+            SelfClip clip ->
+              if clip.id == id then
+                SelfClip {clip | duration = Just duration}
+              else 
+                choice
+            _ -> choice
+      in
+      persist <|
+        { model
+        | thanks = updateChoiceDuration model.thanks
+        , clips = Array.map updateChoiceDuration model.clips
+        , durations = Dict.insert id duration model.durations
+        }
 
 importClips : String -> Model -> List Clip -> List Choice
 importClips id model clips=
@@ -584,22 +583,6 @@ fetchClips auth count id =
     , url = (fetchClipsUrl count id)
     }
 
-fetchClipUrl : String -> String
-fetchClipUrl slug =
-  "https://clips.twitch.tv/api/v2/clips/" ++ slug
-
-fetchClip : String -> Cmd Msg
-fetchClip slug =
-  Http.request
-    { method = "GET"
-    , headers = []
-    , url = fetchClipUrl slug
-    , body = Http.emptyBody
-    , expect = Http.expectJson (httpResponse "clip details" ClipDetails) ClipsV2.clip
-    , timeout = Nothing
-    , tracker = Nothing
-    }
-
 fetchHostsUrl : String -> String
 fetchHostsUrl id =
   "https://p3szakkejk.execute-api.us-east-1.amazonaws.com/production/hosts?include_logins=1&target=" ++ id
@@ -623,6 +606,11 @@ myClip clip =
   , embedUrl = clip.embedUrl
   , broadcasterId = clip.broadcasterId
   , duration = Nothing
+  , videoUrl = clip.thumbnailUrl
+    --|> Debug.log "thumnail"
+    |> String.replace "-preview-480x272.jpg" ".mp4"
+    |> Just
+    --|> Debug.log "video url"
   }
 
 updateClipDuration : Dict String DurationInMilliseconds -> Clip -> Clip

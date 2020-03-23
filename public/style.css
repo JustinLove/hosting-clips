@@ -71,6 +71,9 @@ footer {
   position: fixed;
   bottom: 0;
 }
+#duration-probe {
+  display: none;
+}
 svg.icon {
   display: inline-block;
   width: 1em;

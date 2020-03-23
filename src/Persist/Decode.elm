@@ -26,10 +26,11 @@ clipCache =
 
 clip : Decoder Clip
 clip =
-  map5 Clip
+  map6 Clip
     (field "id" string)
     (field "url" string)
     (field "embedUrl" string)
     (field "broadcasterId" string)
     (succeed Nothing)
+    (maybe (field "videoUrl" string))
 

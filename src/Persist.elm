@@ -15,6 +15,7 @@ type alias Clip =
   , embedUrl : String
   , broadcasterId : String
   , duration : Maybe DurationInMilliseconds
+  , videoUrl : Maybe String
   }
 
 type alias DurationInMilliseconds = Int
