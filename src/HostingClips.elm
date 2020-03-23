@@ -269,17 +269,21 @@ update msg model =
         | thanks = thanks
         , recentClips = thanks :: model.recentClips
         , pendingRequests = model.pendingRequests |> prependRequests
-          [ case thanks of
-              ThanksClip _ clip ->
-                if clip.duration == Nothing then
-                  Cmd.none
-                else
-                  Cmd.none
-              SelfClip clip ->
-                if clip.duration == Nothing then
-                  Cmd.none
-                else
-                  Cmd.none
+          [ case (thanks, model.auth) of
+              (ThanksClip _ clip, Just auth) ->
+                (case (clip.duration, clip.videoUrl) of
+                  (Nothing, Nothing) ->
+                    let _ = Debug.log "backfill video url" clip.id in
+                    fetchClips auth otherClipCount clip.broadcasterId
+                  _ -> Cmd.none
+                )
+              (SelfClip clip, Just auth) ->
+                (case (clip.duration, clip.videoUrl) of
+                  (Nothing, Nothing) ->
+                    let _ = Debug.log "backfill video url" clip.id in
+                    fetchClips auth selfClipCount clip.broadcasterId
+                  _ -> Cmd.none
+                )
               _ -> Cmd.none
           ]
         }
