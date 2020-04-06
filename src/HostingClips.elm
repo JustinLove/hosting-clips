@@ -539,7 +539,7 @@ fetchUserByName : String -> String -> Cmd Msg
 fetchUserByName auth login =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Just auth
+    , auth = auth
     , decoder = Helix.users
     , tagger = httpResponse "user by name" User
     , url = (fetchUserByNameUrl login)
@@ -553,7 +553,7 @@ fetchUserById : String -> String -> Cmd Msg
 fetchUserById auth id =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Just auth
+    , auth = auth
     , decoder = Helix.users
     , tagger = httpResponse "user by id" User
     , url = (fetchUserByIdUrl id)
@@ -567,7 +567,7 @@ fetchSelf : String -> Cmd Msg
 fetchSelf auth =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Just auth
+    , auth = auth
     , decoder = Helix.users
     , tagger = httpResponse "self" User
     , url = fetchSelfUrl
@@ -581,7 +581,7 @@ fetchClips : String -> Int -> String -> Cmd Msg
 fetchClips auth count id =
   Helix.send <|
     { clientId = TwitchId.clientId
-    , auth = Just auth
+    , auth = auth
     , decoder = Helix.clips
     , tagger = httpResponse "clips" (Clips id)
     , url = (fetchClipsUrl count id)
