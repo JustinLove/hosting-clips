@@ -1,5 +1,4 @@
 
-- iframes need embedding domains https://discuss.dev.twitch.tv/t/twitch-embedded-player-updates-in-2020/23956
 - https://obsproject.com/tools/browser-drag-and-drop
 - mature flag?
 
