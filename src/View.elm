@@ -58,7 +58,7 @@ clipsView model =
           div [ class "host clip" ]
             [ displayName name
             , if model.showClip then
-                displayClip model.windowWidth (model.windowHeight - 75) clip
+                displayClip model.location.host model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
             , displayClipActions clip
@@ -77,7 +77,7 @@ clipsView model =
                 ]
               ]
             , if model.showClip then
-                displayClip model.windowWidth (model.windowHeight - 75) clip
+                displayClip model.location.host model.windowWidth (model.windowHeight - 75) clip
               else
                 text clip.embedUrl
             , displayClipActions clip
@@ -145,8 +145,8 @@ displayName name =
     , text " for the host"
     ]
 
-displayClip : Int -> Int -> Clip -> Html msg
-displayClip width height clip =
+displayClip : String -> Int -> Int -> Clip -> Html msg
+displayClip host width height clip =
   div []
     [ div
       [ class "clip-url"
@@ -155,7 +155,7 @@ displayClip width height clip =
       ]
       [ a [ href clip.url ] [ text clip.url ] ]
     , iframe
-      [ src clip.embedUrl
+      [ src (clip.embedUrl ++ "&parent=" ++ host)
       , sandbox "allow-scripts allow-same-origin"
       , attribute "allow" "autoplay"
       , attribute "width" (String.fromFloat ((toFloat width) * 0.8))
