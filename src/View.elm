@@ -155,7 +155,7 @@ displayClip host width height clip =
       ]
       [ a [ href clip.url ] [ text clip.url ] ]
     , iframe
-      [ src (clip.embedUrl ++ "&parent=" ++ host)
+      [ src (clip.embedUrl ++ "&autoplay=true&parent=" ++ host)
       , sandbox "allow-scripts allow-same-origin"
       , attribute "allow" "autoplay"
       , attribute "width" (String.fromFloat ((toFloat width) * 0.8))
