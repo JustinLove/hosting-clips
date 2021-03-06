@@ -172,6 +172,9 @@ update msg model =
     HttpError source (Http.BadStatus 401) ->
       let _ = Debug.log ("fetch auth error: " ++ source) "" in
       (logout model, Cmd.none)
+    HttpError "hosts" (error) ->
+      let _ = Debug.log ("fetch error: hosts") error in
+      (model, maybePickCommand model)
     HttpError source (error) ->
       let _ = Debug.log ("fetch error: " ++ source) error in
       (model, Cmd.none)
