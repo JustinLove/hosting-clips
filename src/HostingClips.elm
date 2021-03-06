@@ -6,7 +6,8 @@ import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Decode as Helix
 import Twitch.Helix as Helix
-import Twitch.Tmi.Decode as Tmi
+import Twitch.Kraken as Kraken
+import Twitch.Kraken.Decode as Kraken
 import TwitchId
 import View exposing (Choice(..), Host)
 
@@ -42,7 +43,7 @@ type Msg
   = Loaded (Maybe Persist)
   | HttpError String Http.Error
   | User (List Helix.User)
-  | Hosts (List Tmi.HostingTarget)
+  | Hosts (List Kraken.Host)
   | Clips String (List Helix.Clip)
   | Pick (Bool, Float)
   | NextChoice Posix
@@ -192,7 +193,7 @@ update msg model =
             Just auth ->
               Cmd.batch
                 [ Navigation.pushUrl m2.navigationKey (createPath m2)
-                , fetchHosts user.id
+                , fetchHosts auth user.id
                 , fetchClips auth selfClipCount user.id
                 ]
             Nothing ->
@@ -296,9 +297,9 @@ update msg model =
       ( { model
         | pendingRequests = model.pendingRequests |> appendRequests
           [ if model.hostLimit >= List.length model.hosts then
-              case model.userId of
-                Just id -> fetchHosts id
-                Nothing -> Cmd.none
+              case (model.userId, model.auth) of
+                (Just id, Just auth) -> fetchHosts auth id
+                _ -> Cmd.none
             else
               Cmd.none
           ]
@@ -344,8 +345,8 @@ update msg model =
           ( case mauth of
               Just auth ->
                 ( case (muserId, mlogin) of
-                  (Just id, Just login) -> [ fetchHosts id ]
-                  (Just id, Nothing) -> [ fetchUserById auth id, fetchHosts id ] 
+                  (Just id, Just login) -> [ fetchHosts auth id ]
+                  (Just id, Nothing) -> [ fetchUserById auth id, fetchHosts auth id ] 
                   (Nothing, Just login) -> [ fetchUserByName auth login ]
                   (Nothing, Nothing) -> [ fetchSelf auth ]
                 )
@@ -592,18 +593,16 @@ fetchClips auth count id =
 
 fetchHostsUrl : String -> String
 fetchHostsUrl id =
-  "https://p3szakkejk.execute-api.us-east-1.amazonaws.com/production/hosts?include_logins=1&target=" ++ id
+  "https://api.twitch.tv/kraken/channels/"++id++"/hosts"
 
-fetchHosts : String -> Cmd Msg
-fetchHosts id =
-  Http.request
-    { method = "GET"
-    , headers = []
-    , url = fetchHostsUrl id
-    , body = Http.emptyBody
-    , expect = Http.expectJson (httpResponse "hosts" Hosts) Tmi.hostingTarget
-    , timeout = Nothing
-    , tracker = Nothing
+fetchHosts : String -> String -> Cmd Msg
+fetchHosts auth id =
+  Kraken.send <|
+    { clientId = TwitchId.clientId
+    , auth = Just auth
+    , decoder = Kraken.hosts
+    , tagger = httpResponse "clips" Hosts
+    , url = (fetchHostsUrl id)
     }
 
 myClip : Helix.Clip -> Clip
@@ -624,10 +623,10 @@ updateClipDuration : Dict String DurationInMilliseconds -> Clip -> Clip
 updateClipDuration durations clip =
   { clip | duration = Dict.get clip.id durations }
 
-myHost : Tmi.HostingTarget -> Host
+myHost : Kraken.Host -> Host
 myHost host =
   { hostId = host.hostId
-  , hostDisplayName = host.hostDisplayName
+  , hostDisplayName = host.hostId
   }
 
 displayNameForHost : List Host -> String -> String
