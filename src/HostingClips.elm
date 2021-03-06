@@ -224,9 +224,6 @@ update msg model =
       let _ = Debug.log "broadcaster" user in
       ( { model
         | userDisplayNames = Dict.insert user.id user.displayName model.userDisplayNames
-        , clips = Array.map (updateName user.id user.displayName) model.clips
-        , recentClips = List.map (updateName user.id user.displayName) model.recentClips
-        , thanks = updateName user.id user.displayName model.thanks
         }
       , Cmd.none
       )
@@ -390,7 +387,7 @@ update msg model =
             , clips = model.clips
               |> Array.filter (\choice ->
                 case choice of
-                  ThanksClip _ clip -> notExcluded model.exclusions clip
+                  ThanksClip clip -> notExcluded model.exclusions clip
                   SelfClip clip -> notExcluded model.exclusions clip
                   _ -> True
                 )
@@ -411,9 +408,9 @@ update msg model =
         duration = round (seconds * 1000)
         updateChoiceDuration choice =
           case choice of
-            ThanksClip mname clip ->
+            ThanksClip clip ->
               if clip.id == id then
-                ThanksClip mname {clip | duration = Just duration}
+                ThanksClip {clip | duration = Just duration}
               else 
                 choice
             SelfClip clip ->
@@ -445,24 +442,13 @@ importClips id model clips=
           if (Just id) == model.userId then
             SelfClip clip
           else
-            ThanksClip (displayNameForHost model.userDisplayNames clip.broadcasterId) clip
+            ThanksClip clip
       )
-
-updateName : UserId -> String -> Choice -> Choice
-updateName id name choice =
-  case choice of
-    ThanksClip _ clip ->
-      if clip.broadcasterId == id then
-        ThanksClip (Just name) clip
-      else
-        choice
-    _ ->
-      choice
 
 requestVideoDataForThanks : Choice -> Model -> Cmd Msg
 requestVideoDataForThanks thanks model =
   case (thanks, model.auth) of
-    (ThanksClip _ clip, Just auth) ->
+    (ThanksClip clip, Just auth) ->
       (case (clip.duration, clip.videoUrl) of
         (Nothing, Nothing) ->
           let _ = Debug.log "backfill video url" clip.id in
@@ -481,7 +467,7 @@ requestVideoDataForThanks thanks model =
 requestNameForThanks : Choice -> Model -> Cmd Msg
 requestNameForThanks thanks model =
   case (thanks, model.auth) of
-    (ThanksClip _ clip, Just auth) ->
+    (ThanksClip clip, Just auth) ->
       (case Dict.get clip.broadcasterId model.userDisplayNames of
         Nothing ->
           let _ = Debug.log "backfill user name" clip.broadcasterId in
@@ -553,7 +539,7 @@ subscriptions model =
         Sub.none
       else
         case model.thanks of
-          ThanksClip _ {duration} ->
+          ThanksClip {duration} ->
             Time.every
               (duration |> Maybe.withDefault clipCycleTime |> toFloat)
               NextChoice
