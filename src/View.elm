@@ -1,4 +1,4 @@
-module View exposing (Msg(..), Choice(..), Host, view, document)
+module View exposing (Msg(..), Choice(..), UserId, ClipId, view, document)
 
 import Persist exposing (Clip)
 import TwitchId
@@ -15,22 +15,20 @@ import Url exposing (Url)
 import Url.Builder as Url
 
 type Msg
-  = Exclude String
+  = Exclude ClipId
   | ShowRecent
   | ShowManage
   | ClipFilter String
-  | ClipDuration String Float
+  | ClipDuration ClipId Float
 
 type Choice
-  = ThanksClip String Clip
+  = ThanksClip (Maybe String) Clip
   | Thanks String
   | SelfClip Clip
   | NoHosts
 
-type alias Host =
-  { hostId : String
-  , hostDisplayName : String
-  }
+type alias UserId = String
+type alias ClipId = String
 
 css = """
 body {
@@ -54,9 +52,10 @@ clipsView model =
   div [ class "view" ]
     [ node "style" [] [ text css ]
     , case model.thanks of
-        ThanksClip name clip ->
+        ThanksClip mname clip ->
           div [ class "host clip" ]
-            [ displayName name
+            [ Maybe.map displayName mname
+              |> Maybe.withDefault (h1 [] [text "Thanks for the host"])
             , if model.showClip then
                 displayClip model.location.host model.windowWidth (model.windowHeight - 75) clip
               else
@@ -145,7 +144,7 @@ displayName name =
     , text " for the host"
     ]
 
-displayClip : String -> Int -> Int -> Clip -> Html msg
+displayClip : UserId -> Int -> Int -> Clip -> Html msg
 displayClip host width height clip =
   div []
     [ div
@@ -204,10 +203,10 @@ displayActions model =
 displayRecentClip : Choice -> Html Msg
 displayRecentClip choice =
   case choice of
-    ThanksClip name clip ->
+    ThanksClip mname clip ->
       li []
         [ button [ onClick (Exclude clip.id) ]
-          [ text ("exclude " ++ name ++ " " ++ clip.id) ]
+          [ text ("exclude " ++ (Maybe.withDefault "" mname) ++ " " ++ clip.id) ]
         ]
     Thanks name -> text ""
     SelfClip clip ->

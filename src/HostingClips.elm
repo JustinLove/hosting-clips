@@ -9,7 +9,7 @@ import Twitch.Helix as Helix
 import Twitch.Kraken as Kraken
 import Twitch.Kraken.Decode as Kraken
 import TwitchId
-import View exposing (Choice(..), Host)
+import View exposing (Choice(..), UserId, ClipId)
 
 import Html
 import Browser
@@ -43,12 +43,14 @@ type Msg
   = Loaded (Maybe Persist)
   | HttpError String Http.Error
   | User (List Helix.User)
+  | Broadcaster (List Helix.User)
   | Hosts (List Kraken.Host)
-  | Clips String (List Helix.Clip)
+  | Clips UserId (List Helix.Clip)
   | Pick (Bool, Float)
   | NextChoice Posix
   | Response Msg
   | NextRequest Posix
+  | CurrentTime Posix
   | CurrentUrl Url
   | Navigate Browser.UrlRequest
   | WindowSize (Int, Int)
@@ -61,23 +63,29 @@ type alias Model =
   , windowHeight : Int
   , time : Posix
   , login : Maybe String
-  , userId : Maybe String
+  , userId : Maybe UserId
   , auth : Maybe String
   , showClip : Bool
   , selfRate : Float
   , hostLimit : Int
-  , hosts : List Host
-  , durations : Dict String DurationInMilliseconds
-  , clipCache : Dict String (Posix, List Clip)
+  , hosts : List UserId
+  , userDisplayNames : Dict UserId String
+  , durations : Dict ClipId DurationInMilliseconds
+  , clipCache : Dict UserId (Posix, List Clip)
   , clips : Array Choice
   , thanks : Choice
-  , exclusions : Set String
+  , exclusions : Set ClipId
   , recentClips : List Choice
   , showingRecent : Bool
   , showingManage : Bool
   , clipFilter : String
   , pendingRequests : List (Cmd Msg)
   , outstandingRequests : Int
+  }
+
+type alias Host =
+  { hostId : UserId
+  , hostDisplayName : String
   }
 
 main = Browser.application
@@ -105,6 +113,7 @@ init flags location key =
       , selfRate = 1.0
       , hostLimit = requestLimit
       , hosts = []
+      , userDisplayNames = Dict.empty
       , durations = Dict.empty
       , clipCache = Dict.empty
       , clips = Array.empty
@@ -125,6 +134,7 @@ init flags location key =
     , Dom.getViewport
       |> Task.map (\viewport -> (round viewport.viewport.width, round viewport.viewport.height))
       |> Task.perform WindowSize
+    , Time.now |> Task.perform CurrentTime
     ]
   )
 
@@ -142,6 +152,7 @@ logout model =
   , selfRate = model.selfRate
   , hostLimit = model.hostLimit
   , hosts = []
+  , userDisplayNames = Dict.empty
   , durations = Dict.empty
   , clipCache = Dict.empty
   , clips = Array.empty
@@ -209,25 +220,39 @@ update msg model =
     User _ ->
       let _ = Debug.log "user did not find that login name" "" in
       (model, Cmd.none)
+    Broadcaster (user::_) ->
+      let _ = Debug.log "boadcaster" user in
+      ( { model
+        | userDisplayNames = Dict.insert user.id user.displayName model.userDisplayNames
+        , clips = Array.map (updateName user.id user.displayName) model.clips
+        , recentClips = List.map (updateName user.id user.displayName) model.recentClips
+        , thanks = updateName user.id user.displayName model.thanks
+        }
+      , Cmd.none
+      )
+    Broadcaster _ ->
+      let _ = Debug.log "broadcaster did not find that login name" "" in
+      (model, Cmd.none)
     Hosts twitchHosts ->
       let
         hosts = List.map myHost twitchHosts
-        (cached, new) = hosts
+        (new, cached) = hosts
           |> List.take model.hostLimit
           |> List.filter (\host -> List.all ((/=) host) model.hosts)
-          |> List.partition (\{hostId} ->
+          |> List.partition (\hostId ->
               case Dict.get hostId model.clipCache of
-                Just (time, clips) -> (Time.posixToMillis time) < ((Time.posixToMillis model.time) - clipCycleTime)
+                Just (time, clips) ->
+                  (Time.posixToMillis time) < ((Time.posixToMillis model.time) - clipCacheTime)
                 Nothing -> False
             )
         requests = case model.auth of
           Just auth ->
             new
-              |> List.map (\{hostId} -> fetchClips auth otherClipCount hostId)
+              |> List.map (\hostId -> fetchClips auth otherClipCount hostId)
           Nothing ->
             []
         choices = cached
-          |> List.concatMap (\{hostId} ->
+          |> List.concatMap (\hostId ->
               case Dict.get hostId model.clipCache of
                 Just (time, clips) -> importClips hostId {model|hosts = hosts} clips
                 Nothing -> []
@@ -273,22 +298,8 @@ update msg model =
         | thanks = thanks
         , recentClips = thanks :: model.recentClips
         , pendingRequests = model.pendingRequests |> prependRequests
-          [ case (thanks, model.auth) of
-              (ThanksClip _ clip, Just auth) ->
-                (case (clip.duration, clip.videoUrl) of
-                  (Nothing, Nothing) ->
-                    let _ = Debug.log "backfill video url" clip.id in
-                    fetchClips auth otherClipCount clip.broadcasterId
-                  _ -> Cmd.none
-                )
-              (SelfClip clip, Just auth) ->
-                (case (clip.duration, clip.videoUrl) of
-                  (Nothing, Nothing) ->
-                    let _ = Debug.log "backfill video url" clip.id in
-                    fetchClips auth selfClipCount clip.broadcasterId
-                  _ -> Cmd.none
-                )
-              _ -> Cmd.none
+          [ requestVideoDataForThanks thanks model
+          , requestNameForThanks thanks model
           ]
         }
       , Cmd.none
@@ -318,6 +329,8 @@ update msg model =
             , time = time
             }, next)
         _ -> ({model | time = time}, Cmd.none)
+    CurrentTime time ->
+      ({model | time = time}, Cmd.none)
     CurrentUrl location ->
       let
         mlogin = extractSearchArgument "login" location
@@ -398,9 +411,9 @@ update msg model =
         duration = round (seconds * 1000)
         updateChoiceDuration choice =
           case choice of
-            ThanksClip name clip ->
+            ThanksClip mname clip ->
               if clip.id == id then
-                ThanksClip name {clip | duration = Just duration}
+                ThanksClip mname {clip | duration = Just duration}
               else 
                 choice
             SelfClip clip ->
@@ -417,13 +430,13 @@ update msg model =
         , durations = Dict.insert id duration model.durations
         }
 
-importClips : String -> Model -> List Clip -> List Choice
+importClips : UserId -> Model -> List Clip -> List Choice
 importClips id model clips=
   if List.isEmpty clips then
     if (Just id) == model.userId then
       []
     else
-      [Thanks (displayNameForHost model.hosts id)]
+      [Thanks (displayNameForHost model.userDisplayNames id |> Maybe.withDefault id)]
   else
     clips
       |> List.filter (notExcluded model.exclusions)
@@ -432,8 +445,51 @@ importClips id model clips=
           if (Just id) == model.userId then
             SelfClip clip
           else
-            ThanksClip (displayNameForHost model.hosts clip.broadcasterId) clip
+            ThanksClip (displayNameForHost model.userDisplayNames clip.broadcasterId) clip
       )
+
+updateName : UserId -> String -> Choice -> Choice
+updateName id name choice =
+  case choice of
+    ThanksClip _ clip ->
+      if clip.broadcasterId == id then
+        ThanksClip (Just name) clip
+      else
+        choice
+    _ ->
+      choice
+
+requestVideoDataForThanks : Choice -> Model -> Cmd Msg
+requestVideoDataForThanks thanks model =
+  case (thanks, model.auth) of
+    (ThanksClip _ clip, Just auth) ->
+      (case (clip.duration, clip.videoUrl) of
+        (Nothing, Nothing) ->
+          let _ = Debug.log "backfill video url" clip.id in
+          fetchClips auth otherClipCount clip.broadcasterId
+        _ -> Cmd.none
+      )
+    (SelfClip clip, Just auth) ->
+      (case (clip.duration, clip.videoUrl) of
+        (Nothing, Nothing) ->
+          let _ = Debug.log "backfill video url" clip.id in
+          fetchClips auth selfClipCount clip.broadcasterId
+        _ -> Cmd.none
+      )
+    _ -> Cmd.none
+
+requestNameForThanks : Choice -> Model -> Cmd Msg
+requestNameForThanks thanks model =
+  case (thanks, model.auth) of
+    (ThanksClip _ clip, Just auth) ->
+      (case Dict.get clip.broadcasterId model.userDisplayNames of
+        Nothing ->
+          let _ = Debug.log "backfill user name" clip.broadcasterId in
+          fetchBroadcasterById auth clip.broadcasterId
+        Just _ ->
+          Cmd.none
+      )
+    _ -> Cmd.none
 
 persist : Model -> (Model, Cmd Msg)
 persist model =
@@ -525,7 +581,7 @@ isSelf choice =
     SelfClip _ -> True
     _ -> False
 
-notExcluded : Set String -> Clip -> Bool
+notExcluded : Set ClipId -> Clip -> Bool
 notExcluded exclusions clip =
   not <| Set.member clip.id exclusions
 
@@ -549,17 +605,27 @@ fetchUserByName auth login =
     , url = (fetchUserByNameUrl login)
     }
 
-fetchUserByIdUrl : String -> String
+fetchUserByIdUrl : UserId -> String
 fetchUserByIdUrl id =
   "https://api.twitch.tv/helix/users?id=" ++ id
 
-fetchUserById : String -> String -> Cmd Msg
+fetchUserById : String -> UserId -> Cmd Msg
 fetchUserById auth id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
     , decoder = Helix.users
     , tagger = httpResponse "user by id" User
+    , url = (fetchUserByIdUrl id)
+    }
+
+fetchBroadcasterById : String -> UserId -> Cmd Msg
+fetchBroadcasterById auth id =
+  Helix.send <|
+    { clientId = TwitchId.clientId
+    , auth = auth
+    , decoder = Helix.users
+    , tagger = httpResponse "broadcaster by id" Broadcaster
     , url = (fetchUserByIdUrl id)
     }
 
@@ -577,11 +643,11 @@ fetchSelf auth =
     , url = fetchSelfUrl
     }
 
-fetchClipsUrl : Int -> String -> String
+fetchClipsUrl : Int -> UserId -> String
 fetchClipsUrl count id =
   "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (String.fromInt count)
 
-fetchClips : String -> Int -> String -> Cmd Msg
+fetchClips : String -> Int -> UserId -> Cmd Msg
 fetchClips auth count id =
   Helix.send <|
     { clientId = TwitchId.clientId
@@ -591,11 +657,11 @@ fetchClips auth count id =
     , url = (fetchClipsUrl count id)
     }
 
-fetchHostsUrl : String -> String
+fetchHostsUrl : UserId -> String
 fetchHostsUrl id =
   "https://api.twitch.tv/kraken/channels/"++id++"/hosts"
 
-fetchHosts : String -> String -> Cmd Msg
+fetchHosts : String -> UserId -> Cmd Msg
 fetchHosts auth id =
   Kraken.send <|
     { clientId = TwitchId.clientId
@@ -619,23 +685,16 @@ myClip clip =
     --|> Debug.log "video url"
   }
 
-updateClipDuration : Dict String DurationInMilliseconds -> Clip -> Clip
+updateClipDuration : Dict ClipId DurationInMilliseconds -> Clip -> Clip
 updateClipDuration durations clip =
   { clip | duration = Dict.get clip.id durations }
 
-myHost : Kraken.Host -> Host
-myHost host =
-  { hostId = host.hostId
-  , hostDisplayName = host.hostId
-  }
+myHost : Kraken.Host -> UserId
+myHost host = host.hostId
 
-displayNameForHost : List Host -> String -> String
-displayNameForHost hosts id =
-  hosts
-    |> List.filter (\host -> host.hostId == id)
-    |> List.head
-    |> Maybe.map .hostDisplayName
-    |> Maybe.withDefault "Oops, how did that happen?"
+displayNameForHost : Dict UserId String -> UserId -> Maybe String
+displayNameForHost names id =
+  Dict.get id names
 
 extractSearchArgument : String -> Url -> Maybe String
 extractSearchArgument key location =
