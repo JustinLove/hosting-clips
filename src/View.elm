@@ -23,7 +23,7 @@ type Msg
 
 type Choice
   = ThanksClip (Maybe String) Clip
-  | Thanks String
+  | Thanks UserId
   | SelfClip Clip
   | NoHosts
 
@@ -55,7 +55,7 @@ clipsView model =
         ThanksClip mname clip ->
           div [ class "host clip" ]
             [ Maybe.map displayName mname
-              |> Maybe.withDefault (h1 [] [text "Thanks for the host"])
+              |> Maybe.withDefault displayNameless
             , if model.showClip then
                 displayClip model.location.host model.windowWidth (model.windowHeight - 75) clip
               else
@@ -63,9 +63,9 @@ clipsView model =
             , displayClipActions clip
             , measureClipDuration clip
             ]
-        Thanks name ->
+        Thanks userId ->
           div [ class "host no-clip" ]
-            [ displayName name
+            [ displayNameForId model userId
             ]
         SelfClip clip ->
           div [ class "self host clip" ]
@@ -144,6 +144,17 @@ displayName name =
     , text " for the host"
     ]
 
+displayNameless : Html msg
+displayNameless =
+  h1 []
+    [ text "Thanks for the host"
+    ]
+
+displayNameForId model id =
+  case Dict.get id model.userDisplayNames of
+    Just name -> displayName name
+    Nothing -> displayNameless
+
 displayClip : UserId -> Int -> Int -> Clip -> Html msg
 displayClip host width height clip =
   div []
@@ -208,7 +219,7 @@ displayRecentClip choice =
         [ button [ onClick (Exclude clip.id) ]
           [ text ("exclude " ++ (Maybe.withDefault "" mname) ++ " " ++ clip.id) ]
         ]
-    Thanks name -> text ""
+    Thanks id -> text ""
     SelfClip clip ->
       li []
         [ button [ onClick (Exclude clip.id) ]

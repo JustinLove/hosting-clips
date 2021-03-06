@@ -221,7 +221,7 @@ update msg model =
       let _ = Debug.log "user did not find that login name" "" in
       (model, Cmd.none)
     Broadcaster (user::_) ->
-      let _ = Debug.log "boadcaster" user in
+      let _ = Debug.log "broadcaster" user in
       ( { model
         | userDisplayNames = Dict.insert user.id user.displayName model.userDisplayNames
         , clips = Array.map (updateName user.id user.displayName) model.clips
@@ -436,7 +436,7 @@ importClips id model clips=
     if (Just id) == model.userId then
       []
     else
-      [Thanks (displayNameForHost model.userDisplayNames id |> Maybe.withDefault id)]
+      [Thanks id]
   else
     clips
       |> List.filter (notExcluded model.exclusions)
@@ -486,6 +486,14 @@ requestNameForThanks thanks model =
         Nothing ->
           let _ = Debug.log "backfill user name" clip.broadcasterId in
           fetchBroadcasterById auth clip.broadcasterId
+        Just _ ->
+          Cmd.none
+      )
+    (Thanks userId, Just auth) ->
+      (case Dict.get userId model.userDisplayNames of
+        Nothing ->
+          let _ = Debug.log "backfill user name" userId in
+          fetchBroadcasterById auth userId
         Just _ ->
           Cmd.none
       )
