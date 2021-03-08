@@ -1,7 +1,7 @@
 module HostingClips exposing (..)
 
 import LocalStorage
-import Persist exposing (Persist, Clip, DurationInMilliseconds)
+import Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Decode as Helix
@@ -9,7 +9,7 @@ import Twitch.Helix as Helix
 import Twitch.Kraken as Kraken
 import Twitch.Kraken.Decode as Kraken
 import TwitchId
-import View exposing (Choice(..), UserId, ClipId)
+import View exposing (Choice(..))
 
 import Html
 import Browser
@@ -31,13 +31,14 @@ import Url.Parser
 import Url.Parser.Query
 
 requestLimit = 100
-rateLimit = 30
+rateLimit = 800
 requestRate = 60*1000/rateLimit
 clipCycleTime = 60*1000
 noClipCycleTime = 10*1000
 selfClipCount = 100
 otherClipCount = 20
 clipCacheTime = 48 * 60 * 60 * 1000
+nameCacheTime = 30 * 24 * 60 * 60 * 1000
 
 type Msg
   = Loaded (Maybe Persist)
@@ -69,7 +70,7 @@ type alias Model =
   , selfRate : Float
   , hostLimit : Int
   , hosts : List UserId
-  , userDisplayNames : Dict UserId String
+  , userDisplayNames : Dict UserId (Posix, String)
   , durations : Dict ClipId DurationInMilliseconds
   , clipCache : Dict UserId (Posix, List Clip)
   , clips : Array Choice
@@ -175,6 +176,7 @@ update msg model =
               | exclusions = Set.fromList state.exclusions
               , durations = Dict.fromList state.durations
               , clipCache = state.clipCache
+              , userDisplayNames = state.nameCache
               }
           Nothing ->
             model
@@ -222,11 +224,10 @@ update msg model =
       (model, Cmd.none)
     Broadcaster (user::_) ->
       let _ = Debug.log "broadcaster" user in
-      ( { model
-        | userDisplayNames = Dict.insert user.id user.displayName model.userDisplayNames
-        }
-      , Cmd.none
-      )
+      { model
+      | userDisplayNames = Dict.insert user.id (model.time, user.displayName) model.userDisplayNames
+      }
+        |> persist
     Broadcaster _ ->
       let _ = Debug.log "broadcaster did not find that login name" "" in
       (model, Cmd.none)
@@ -472,16 +473,22 @@ requestNameForThanks thanks model =
         Nothing ->
           let _ = Debug.log "backfill user name" clip.broadcasterId in
           fetchBroadcasterById auth clip.broadcasterId
-        Just _ ->
-          Cmd.none
+        Just (time, _) ->
+          if (Time.posixToMillis time) < ((Time.posixToMillis model.time) - nameCacheTime) then
+            fetchBroadcasterById auth clip.broadcasterId
+          else
+            Cmd.none
       )
     (Thanks userId, Just auth) ->
       (case Dict.get userId model.userDisplayNames of
         Nothing ->
           let _ = Debug.log "backfill user name" userId in
           fetchBroadcasterById auth userId
-        Just _ ->
-          Cmd.none
+        Just (time, _) ->
+          if (Time.posixToMillis time) < ((Time.posixToMillis model.time) - nameCacheTime) then
+            fetchBroadcasterById auth userId
+          else
+            Cmd.none
       )
     _ -> Cmd.none
 
@@ -495,6 +502,7 @@ saveState model =
     (Set.toList model.exclusions)
     (Dict.toList model.durations)
     model.clipCache
+    model.userDisplayNames
       |> Persist.Encode.persist
       |> LocalStorage.saveJson
 

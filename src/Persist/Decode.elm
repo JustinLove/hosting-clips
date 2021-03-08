@@ -1,6 +1,6 @@
 module Persist.Decode exposing (persist, clip)
 
-import Persist exposing (Persist, Clip)
+import Persist exposing (Persist, Clip, UserId)
 
 import Json.Decode exposing (..)
 import Dict exposing (Dict)
@@ -8,7 +8,7 @@ import Time exposing (Posix)
 
 persist : Decoder Persist
 persist =
-  map3 Persist
+  map4 Persist
     (field "exclusions" (list string))
     (field "durations" (keyValuePairs int))
     ( oneOf
@@ -16,8 +16,13 @@ persist =
       , succeed Dict.empty
       ]
     )
+    ( oneOf
+      [ (field "nameCache" nameCache)
+      , succeed Dict.empty
+      ]
+    )
 
-clipCache : Decoder (Dict String (Posix, List Clip))
+clipCache : Decoder (Dict UserId (Posix, List Clip))
 clipCache =
   dict
     <| map2 Tuple.pair
@@ -34,3 +39,9 @@ clip =
     (succeed Nothing)
     (maybe (field "videoUrl" string))
 
+nameCache : Decoder (Dict UserId (Posix, String))
+nameCache =
+  dict
+    <| map2 Tuple.pair
+      (field "time" (map Time.millisToPosix int))
+      (field "name" string)

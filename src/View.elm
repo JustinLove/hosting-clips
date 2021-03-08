@@ -1,15 +1,16 @@
-module View exposing (Msg(..), Choice(..), UserId, ClipId, view, document)
+module View exposing (Msg(..), Choice(..), view, document)
 
-import Persist exposing (Clip)
+import Persist exposing (Clip, UserId, ClipId)
 import TwitchId
 
-import Dict
+import Dict exposing (Dict)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (on, onClick, onCheck, onInput)
 import Set
 import Svg exposing (svg, use)
 import Svg.Attributes exposing (xlinkHref)
+import Time exposing (Posix)
 import Json.Decode
 import Url exposing (Url)
 import Url.Builder as Url
@@ -26,9 +27,6 @@ type Choice
   | Thanks UserId
   | SelfClip Clip
   | NoHosts
-
-type alias UserId = String
-type alias ClipId = String
 
 css = """
 body {
@@ -151,7 +149,7 @@ displayNameless =
 
 displayNameForId model id =
   case Dict.get id model.userDisplayNames of
-    Just name -> displayName name
+    Just (_, name) -> displayName name
     Nothing -> displayNameless
 
 displayClip : UserId -> Int -> Int -> Clip -> Html msg
@@ -210,12 +208,18 @@ displayActions model =
         text ""
     ]
 
+userNameForId : Dict UserId (Posix, String) -> UserId -> String
+userNameForId userDisplayNames id =
+  Dict.get id userDisplayNames
+    |> Maybe.map Tuple.second
+    |> Maybe.withDefault ""
+
 displayRecentClip model choice =
   case choice of
     ThanksClip clip ->
       li []
         [ button [ onClick (Exclude clip.id) ]
-          [ text ("exclude " ++ (Maybe.withDefault "" (Dict.get clip.broadcasterId model.userDisplayNames)) ++ " " ++ clip.id) ]
+          [ text ("exclude " ++ (userNameForId model.userDisplayNames clip.broadcasterId) ++ " " ++ clip.id) ]
         ]
     Thanks id -> text ""
     SelfClip clip ->

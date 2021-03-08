@@ -1,6 +1,6 @@
 module Persist.Encode exposing (persist, clip)
 
-import Persist exposing (Persist, Clip)
+import Persist exposing (Persist, Clip, UserId)
 
 import Json.Encode exposing (..)
 import Dict exposing (Dict)
@@ -12,9 +12,10 @@ persist p =
     [ ("exclusions", list string p.exclusions)
     , ("durations", object <| List.map (\(id, time) -> (id, int time)) p.durations)
     , ("clipCache", clipCache p.clipCache)
+    , ("nameCache", nameCache p.nameCache)
     ]
 
-clipCache : Dict String (Posix, List Clip) -> Value
+clipCache : Dict UserId (Posix, List Clip) -> Value
 clipCache =
   Dict.toList
     >> List.map (\(id, (time, clips)) ->
@@ -38,3 +39,15 @@ clip c =
       Nothing -> []
     )
     |> object
+
+nameCache : Dict UserId (Posix, String) -> Value
+nameCache =
+  Dict.toList
+    >> List.map (\(id, (time, name)) ->
+        (id, object
+          [ ("time", int <| Time.posixToMillis time)
+          , ("name", string name)
+          ]
+        )
+      )
+    >> object

@@ -1,21 +1,25 @@
-module Persist exposing (Persist, Clip, DurationInMilliseconds)
+module Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 
 import Dict exposing (Dict)
 import Time exposing (Posix)
 
 type alias Persist =
-  { exclusions : List String
-  , durations : List (String, DurationInMilliseconds)
-  , clipCache : Dict String (Posix, List Clip)
+  { exclusions : List ClipId
+  , durations : List (ClipId, DurationInMilliseconds)
+  , clipCache : Dict UserId (Posix, List Clip)
+  , nameCache : Dict UserId (Posix, String)
   }
 
 type alias Clip =
-  { id : String
+  { id : ClipId
   , url : String
   , embedUrl : String
-  , broadcasterId : String
+  , broadcasterId : UserId
   , duration : Maybe DurationInMilliseconds
   , videoUrl : Maybe String
   }
 
 type alias DurationInMilliseconds = Int
+type alias UserId = String
+type alias ClipId = String
+

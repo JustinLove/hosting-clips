@@ -1,5 +1,8 @@
 
 - may need: https://api.twitch.tv/kraken/channels/CHANNELID/hosts
+  - name is now in clip
+    - clips are cached, so we need to update storage an handle case where not present
+  - fetching names for other users is delayed
 - https://obsproject.com/tools/browser-drag-and-drop
 - mature flag?
 
