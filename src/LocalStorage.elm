@@ -20,9 +20,9 @@ decodeLoaded : Json.Decode.Decoder a -> Maybe String -> Maybe a
 decodeLoaded decoder =
   Maybe.andThen (\string ->
     string
-     |> Json.Decode.decodeString decoder
-     |> Result.mapError (Debug.log "local storage decode error")
-     |> Result.toMaybe
+      |> Json.Decode.decodeString decoder
+      |> Result.mapError (Debug.log "local storage decode error")
+      |> Result.toMaybe
     )
 
 port localStorageSave : String -> Cmd msg

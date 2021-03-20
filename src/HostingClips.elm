@@ -1,13 +1,12 @@
 module HostingClips exposing (..)
 
+import Decode exposing (User)
 import LocalStorage
 import Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 import Persist.Encode
 import Persist.Decode
-import Twitch.Helix.Decode as Helix
-import Twitch.Helix as Helix
-import Twitch.Kraken as Kraken
-import Twitch.Kraken.Decode as Kraken
+import Twitch.Helix.Request as Helix
+import Twitch.Kraken.Request as Kraken
 import TwitchId
 import View exposing (Choice(..))
 
@@ -43,10 +42,10 @@ nameCacheTime = 30 * 24 * 60 * 60 * 1000
 type Msg
   = Loaded (Maybe Persist)
   | HttpError String Http.Error
-  | User (List Helix.User)
-  | Broadcaster (List Helix.User)
-  | Hosts (List Kraken.Host)
-  | Clips UserId (List Helix.Clip)
+  | Self (List User)
+  | Broadcaster (List User)
+  | Hosts (List UserId)
+  | Clips UserId (List Clip)
   | Pick (Bool, Float)
   | NextChoice Posix
   | Response Msg
@@ -179,7 +178,7 @@ update msg model =
               , userDisplayNames = state.nameCache
               }
           Nothing ->
-            model
+            resolveLoaded model
         )
       , Cmd.none
       )
@@ -192,7 +191,7 @@ update msg model =
     HttpError source (error) ->
       let _ = Debug.log ("fetch error: " ++ source) error in
       (model, Cmd.none)
-    User (user::_) ->
+    Self (user::_) ->
       let
         m2 =
           { model
@@ -219,7 +218,7 @@ update msg model =
         else
           pickCommand m2
       )
-    User _ ->
+    Self _ ->
       let _ = Debug.log "user did not find that login name" "" in
       (model, Cmd.none)
     Broadcaster (user::_) ->
@@ -231,10 +230,9 @@ update msg model =
     Broadcaster _ ->
       let _ = Debug.log "broadcaster did not find that login name" "" in
       (model, Cmd.none)
-    Hosts twitchHosts ->
+    Hosts hosts ->
       let
-        hosts = List.map myHost twitchHosts
-        (new, cached) = hosts
+        (cached, new) = hosts
           |> List.take model.hostLimit
           |> List.filter (\host -> List.all ((/=) host) model.hosts)
           |> List.partition (\hostId ->
@@ -264,10 +262,8 @@ update msg model =
         }
       , maybePickCommand model
       )
-    Clips id twitchClips ->
+    Clips id clips ->
       let
-        clips = twitchClips
-          |> List.map myClip
         choices = importClips id model clips |> Array.fromList
         m2 =
           { model
@@ -345,7 +341,7 @@ update msg model =
         , auth = mauth
         , showClip = case Maybe.withDefault "true" mshowClip of
             "false" -> False
-            _ -> True
+            _ -> False
         , selfRate = mselfRate
           |> Maybe.andThen String.toFloat
           |> Maybe.withDefault 1.0
@@ -602,8 +598,8 @@ fetchUserByName auth login =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Helix.users
-    , tagger = httpResponse "user by name" User
+    , decoder = Decode.users
+    , tagger = httpResponse "user by name" Self
     , url = (fetchUserByNameUrl login)
     }
 
@@ -616,8 +612,8 @@ fetchUserById auth id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Helix.users
-    , tagger = httpResponse "user by id" User
+    , decoder = Decode.users
+    , tagger = httpResponse "user by id" Self
     , url = (fetchUserByIdUrl id)
     }
 
@@ -626,7 +622,7 @@ fetchBroadcasterById auth id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Helix.users
+    , decoder = Decode.users
     , tagger = httpResponse "broadcaster by id" Broadcaster
     , url = (fetchUserByIdUrl id)
     }
@@ -640,8 +636,8 @@ fetchSelf auth =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Helix.users
-    , tagger = httpResponse "self" User
+    , decoder = Decode.users
+    , tagger = httpResponse "self" Self
     , url = fetchSelfUrl
     }
 
@@ -654,7 +650,7 @@ fetchClips auth count id =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Helix.clips
+    , decoder = Decode.clips
     , tagger = httpResponse "clips" (Clips id)
     , url = (fetchClipsUrl count id)
     }
@@ -668,31 +664,14 @@ fetchHosts auth id =
   Kraken.send <|
     { clientId = TwitchId.clientId
     , auth = Just auth
-    , decoder = Kraken.hosts
-    , tagger = httpResponse "clips" Hosts
+    , decoder = Decode.hosts
+    , tagger = httpResponse "hosts" Hosts
     , url = (fetchHostsUrl id)
     }
-
-myClip : Helix.Clip -> Clip
-myClip clip =
-  { id = clip.id
-  , url = clip.url
-  , embedUrl = clip.embedUrl
-  , broadcasterId = clip.broadcasterId
-  , duration = Nothing
-  , videoUrl = clip.thumbnailUrl
-    --|> Debug.log "thumnail"
-    |> String.replace "-preview-480x272.jpg" ".mp4"
-    |> Just
-    --|> Debug.log "video url"
-  }
 
 updateClipDuration : Dict ClipId DurationInMilliseconds -> Clip -> Clip
 updateClipDuration durations clip =
   { clip | duration = Dict.get clip.id durations }
-
-myHost : Kraken.Host -> UserId
-myHost host = host.hostId
 
 displayNameForHost : Dict UserId String -> UserId -> Maybe String
 displayNameForHost names id =
