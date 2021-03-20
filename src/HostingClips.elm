@@ -269,6 +269,11 @@ update msg model =
           { model
           | clips = Array.append model.clips choices
           , clipCache = Dict.insert id (model.time, clips) model.clipCache
+          , pendingRequests = model.pendingRequests |> appendRequests
+            (case (model.auth, clips) of
+              (Just auth, []) -> [fetchBroadcasterById auth id]
+              _ -> []
+            )
           }
       in
       ( m2
