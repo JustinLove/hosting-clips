@@ -14,6 +14,7 @@
 <script type="text/javascript">
   var app = Elm.HostingClips.init()
 
+  // ------------------ LocalStorage ------------------
   var key = 'hosting-clips'
 
   app.ports.localStorageSave.subscribe(function(value) {
@@ -22,6 +23,34 @@
 
   var loaded = localStorage.getItem(key)
   app.ports.localStorageLoaded.send(loaded)
+
+  // ------------------ Log ------------------
+  var logCommand = function(message) {
+    switch(message.kind) {
+      case 'debug':
+        console.debug(message.note, message.value)
+        break
+      case 'log':
+        console.log(message.note)
+        break
+      case 'info':
+        console.info(message.note)
+        break
+      case 'warn':
+        console.warn(message.note)
+        break
+      case 'error':
+        console.error(message.note, message.value)
+        break
+      default:
+        console.log('unknown message', message)
+        break;
+    }
+  }
+
+  if (app.ports.logCommand) {
+    app.ports.logCommand.subscribe(logCommand)
+  }
 </script>
 <script defer src="svgxuse.js"></script>
 

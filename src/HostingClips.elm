@@ -2,6 +2,7 @@ module HostingClips exposing (..)
 
 import Decode exposing (User)
 import LocalStorage
+import Log
 import Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 import Persist.Encode
 import Persist.Decode
@@ -183,14 +184,15 @@ update msg model =
       , Cmd.none
       )
     HttpError source (Http.BadStatus 401) ->
-      let _ = Debug.log ("fetch auth error: " ++ source) "" in
-      (logout model, Cmd.none)
+      (logout model, Log.warn ("fetch auth error: " ++ source))
     HttpError "hosts" (error) ->
-      let _ = Debug.log ("fetch error: hosts") error in
-      (model, maybePickCommand model)
+      (model, Cmd.batch
+        [ maybePickCommand model
+        , Log.httpError "fetch error: hosts" error
+        ]
+      )
     HttpError source (error) ->
-      let _ = Debug.log ("fetch error: " ++ source) error in
-      (model, Cmd.none)
+      (model, Log.httpError ("fetch error: " ++ source) error)
     Self (user::_) ->
       let
         m2 =
@@ -219,16 +221,14 @@ update msg model =
           pickCommand m2
       )
     Self _ ->
-      let _ = Debug.log "user did not find that login name" "" in
-      (model, Cmd.none)
+      (model, Log.warn "user did not find that login name")
     Broadcaster (user::_) ->
       { model
       | userDisplayNames = Dict.insert user.id (model.time, user.displayName) model.userDisplayNames
       }
         |> persist
     Broadcaster _ ->
-      let _ = Debug.log "broadcaster did not find that login name" "" in
-      (model, Cmd.none)
+      (model, Log.warn "broadcaster did not find that login name")
     Hosts hosts ->
       let
         (cached, new) = hosts
@@ -452,15 +452,19 @@ requestVideoDataForThanks thanks model =
     (ThanksClip clip, Just auth) ->
       (case (clip.duration, clip.videoUrl) of
         (Nothing, Nothing) ->
-          let _ = Debug.log "backfill video url" clip.id in
-          fetchClips auth otherClipCount clip.broadcasterId
+          Cmd.batch
+            [ Log.info ("backfill video url" ++ clip.id)
+            , fetchClips auth otherClipCount clip.broadcasterId
+            ]
         _ -> Cmd.none
       )
     (SelfClip clip, Just auth) ->
       (case (clip.duration, clip.videoUrl) of
         (Nothing, Nothing) ->
-          let _ = Debug.log "backfill video url" clip.id in
-          fetchClips auth selfClipCount clip.broadcasterId
+          Cmd.batch
+            [ Log.info ("backfill video url" ++ clip.id)
+            , fetchClips auth selfClipCount clip.broadcasterId
+            ]
         _ -> Cmd.none
       )
     _ -> Cmd.none
@@ -471,8 +475,10 @@ requestNameForThanks thanks model =
     (ThanksClip clip, Just auth) ->
       (case Dict.get clip.broadcasterId model.userDisplayNames of
         Nothing ->
-          let _ = Debug.log "backfill user name" clip.broadcasterId in
-          fetchBroadcasterById auth clip.broadcasterId
+          Cmd.batch
+            [ Log.info ("backfill user name" ++ clip.broadcasterId)
+            , fetchBroadcasterById auth clip.broadcasterId
+            ]
         Just (time, _) ->
           if (Time.posixToMillis time) < ((Time.posixToMillis model.time) - nameCacheTime) then
             fetchBroadcasterById auth clip.broadcasterId
@@ -482,8 +488,10 @@ requestNameForThanks thanks model =
     (Thanks userId, Just auth) ->
       (case Dict.get userId model.userDisplayNames of
         Nothing ->
-          let _ = Debug.log "backfill user name" userId in
-          fetchBroadcasterById auth userId
+          Cmd.batch
+            [ Log.info ("backfill user name" ++ userId)
+            , fetchBroadcasterById auth userId
+            ]
         Just (time, _) ->
           if (Time.posixToMillis time) < ((Time.posixToMillis model.time) - nameCacheTime) then
             fetchBroadcasterById auth userId
