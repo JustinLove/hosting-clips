@@ -39,6 +39,7 @@ clip =
     |> map2 (|>) Clip.url
     |> map2 (|>) Clip.embedUrl
     |> map2 (|>) Clip.broadcasterId
+    |> map2 (|>) (Clip.broadcasterName |> map Just)
     |> map2 (|>) (succeed Nothing)
     |> map2 (|>) thumbnail
 

@@ -38,6 +38,10 @@ clip c =
       Just videoUrl -> [("videoUrl", string videoUrl)]
       Nothing -> []
     )
+    |> List.append (case c.broadcasterName of
+      Just name -> [("broadcasterName", string name)]
+      Nothing -> []
+    )
     |> object
 
 nameCache : Dict UserId (Posix, String) -> Value

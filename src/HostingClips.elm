@@ -222,7 +222,6 @@ update msg model =
       let _ = Debug.log "user did not find that login name" "" in
       (model, Cmd.none)
     Broadcaster (user::_) ->
-      let _ = Debug.log "broadcaster" user in
       { model
       | userDisplayNames = Dict.insert user.id (model.time, user.displayName) model.userDisplayNames
       }

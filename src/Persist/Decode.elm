@@ -31,13 +31,14 @@ clipCache =
 
 clip : Decoder Clip
 clip =
-  map6 Clip
-    (field "id" string)
-    (field "url" string)
-    (field "embedUrl" string)
-    (field "broadcasterId" string)
-    (succeed Nothing)
-    (maybe (field "videoUrl" string))
+  succeed Clip
+    |> map2 (|>) (field "id" string)
+    |> map2 (|>) (field "url" string)
+    |> map2 (|>) (field "embedUrl" string)
+    |> map2 (|>) (field "broadcasterId" string)
+    |> map2 (|>) (maybe (field "broadcasterName" string))
+    |> map2 (|>) (succeed Nothing)
+    |> map2 (|>) (maybe (field "videoUrl" string))
 
 nameCache : Decoder (Dict UserId (Posix, String))
 nameCache =

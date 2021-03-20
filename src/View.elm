@@ -52,7 +52,9 @@ clipsView model =
     , case model.thanks of
         ThanksClip clip ->
           div [ class "host clip" ]
-            [ displayNameForId model clip.broadcasterId
+            [ case clip.broadcasterName of
+              Just name -> displayName name
+              Nothing -> displayNameForId model clip.broadcasterId
             , if model.showClip then
                 displayClip model.location.host model.windowWidth (model.windowHeight - 75) clip
               else
