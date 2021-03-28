@@ -345,7 +345,7 @@ update msg model =
         , auth = mauth
         , showClip = case Maybe.withDefault "true" mshowClip of
             "false" -> False
-            _ -> False
+            _ -> True
         , selfRate = mselfRate
           |> Maybe.andThen String.toFloat
           |> Maybe.withDefault 1.0
