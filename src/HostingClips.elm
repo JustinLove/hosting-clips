@@ -41,7 +41,7 @@ clipCacheTime = 48 * 60 * 60 * 1000
 nameCacheTime = 30 * 24 * 60 * 60 * 1000
 
 type Msg
-  = Loaded (Maybe Persist)
+  = Loaded (LocalStorage.LoadResult Persist)
   | HttpError String Http.Error
   | Self (List User)
   | Broadcaster (List User)
@@ -169,18 +169,21 @@ logout model =
 
 update msg model =
   case msg of
-    Loaded mstate ->
-      ( ( case mstate of
-          Just state ->
-            resolveLoaded { model
-              | exclusions = Set.fromList state.exclusions
-              , durations = Dict.fromList state.durations
-              , clipCache = state.clipCache
-              , userDisplayNames = state.nameCache
-              }
-          Nothing ->
-            resolveLoaded model
-        )
+    Loaded (LocalStorage.Data state) ->
+      ( resolveLoaded { model
+          | exclusions = Set.fromList state.exclusions
+          , durations = Dict.fromList state.durations
+          , clipCache = state.clipCache
+          , userDisplayNames = state.nameCache
+          }
+      , Cmd.none
+      )
+    Loaded (LocalStorage.Error err) ->
+      ( resolveLoaded model
+      , Log.decodeError "error loading saved state" err
+      )
+    Loaded (LocalStorage.NoData) ->
+      ( resolveLoaded model
       , Cmd.none
       )
     HttpError source (Http.BadStatus 401) ->

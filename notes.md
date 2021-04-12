@@ -1,7 +1,17 @@
-- chat host annoucements?
-- local storage as Result?
+- excluded clips export
+  - copy-paste may work with OBS 27
+- replace hosts with hostable
+  - records
+  - decoders
+  - file import
+  - exclude certain tags
+  - how to scramble user list
+  - possible rank tags
+  - possible rank games
 - https://obsproject.com/tools/browser-drag-and-drop
 - mature flag?
+
+- chat host annoucements - nope
 
 ## CORS proxy (obsolete)
 
