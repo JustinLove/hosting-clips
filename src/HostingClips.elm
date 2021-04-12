@@ -7,7 +7,7 @@ import Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Request as Helix
-import Twitch.Kraken.Request as Kraken
+--import Twitch.Kraken.Request as Kraken
 import TwitchId
 import View exposing (Choice(..))
 
@@ -207,7 +207,7 @@ update msg model =
             Just auth ->
               Cmd.batch
                 [ Navigation.pushUrl m2.navigationKey (createPath m2)
-                , fetchHosts auth user.id
+                --, maybePickCommand m2 --, fetchHosts auth user.id
                 , fetchClips auth selfClipCount user.id
                 ]
             Nothing ->
@@ -307,7 +307,7 @@ update msg model =
         | pendingRequests = model.pendingRequests |> appendRequests
           [ if model.hostLimit >= List.length model.hosts then
               case (model.userId, model.auth) of
-                (Just id, Just auth) -> fetchHosts auth id
+                --(Just id, Just auth) -> fetchHosts auth id
                 _ -> Cmd.none
             else
               Cmd.none
@@ -356,8 +356,8 @@ update msg model =
           ( case mauth of
               Just auth ->
                 ( case (muserId, mlogin) of
-                  (Just id, Just login) -> [ fetchHosts auth id ]
-                  (Just id, Nothing) -> [ fetchUserById auth id, fetchHosts auth id ] 
+                  (Just id, Just login) -> [] -- [ fetchHosts auth id ]
+                  (Just id, Nothing) -> [ fetchUserById auth id ] --fetchHosts auth id ] 
                   (Nothing, Just login) -> [ fetchUserByName auth login ]
                   (Nothing, Nothing) -> [ fetchSelf auth ]
                 )
@@ -526,7 +526,7 @@ resolveLoaded model =
     requests = case (model.auth, model.userId) of
       (Just auth, Just id) ->
         if Dict.member id model.clipCache then
-          []
+          [maybePickCommand model]
         else
           [fetchClips auth selfClipCount id]
       _ -> []
@@ -665,20 +665,6 @@ fetchClips auth count id =
     , decoder = Decode.clips
     , tagger = httpResponse "clips" (Clips id)
     , url = (fetchClipsUrl count id)
-    }
-
-fetchHostsUrl : UserId -> String
-fetchHostsUrl id =
-  "https://api.twitch.tv/kraken/channels/"++id++"/hosts"
-
-fetchHosts : String -> UserId -> Cmd Msg
-fetchHosts auth id =
-  Kraken.send <|
-    { clientId = TwitchId.clientId
-    , auth = Just auth
-    , decoder = Decode.hosts
-    , tagger = httpResponse "hosts" Hosts
-    , url = (fetchHostsUrl id)
     }
 
 updateClipDuration : Dict ClipId DurationInMilliseconds -> Clip -> Clip

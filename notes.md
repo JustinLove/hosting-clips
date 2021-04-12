@@ -1,3 +1,4 @@
+- chat host annoucements?
 - local storage as Result?
 - https://obsproject.com/tools/browser-drag-and-drop
 - mature flag?
