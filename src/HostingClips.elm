@@ -45,7 +45,6 @@ type Msg
   | HttpError String Http.Error
   | Self (List User)
   | Broadcaster (List User)
-  | Hosts (List UserId)
   | Clips UserId (List Clip)
   | Pick (Bool, Float)
   | NextChoice Posix
@@ -68,7 +67,6 @@ type alias Model =
   , auth : Maybe String
   , showClip : Bool
   , selfRate : Float
-  , hostLimit : Int
   , hosts : List UserId
   , userDisplayNames : Dict UserId (Posix, String)
   , durations : Dict ClipId DurationInMilliseconds
@@ -112,7 +110,6 @@ init flags location key =
       , auth = Nothing
       , showClip = True
       , selfRate = 1.0
-      , hostLimit = requestLimit
       , hosts = []
       , userDisplayNames = Dict.empty
       , durations = Dict.empty
@@ -151,7 +148,6 @@ logout model =
   , auth = Nothing
   , showClip = model.showClip
   , selfRate = model.selfRate
-  , hostLimit = model.hostLimit
   , hosts = []
   , userDisplayNames = Dict.empty
   , durations = Dict.empty
@@ -210,7 +206,6 @@ update msg model =
             Just auth ->
               Cmd.batch
                 [ Navigation.pushUrl m2.navigationKey (createPath m2)
-                --, maybePickCommand m2 --, fetchHosts auth user.id
                 , fetchClips auth selfClipCount user.id
                 ]
             Nothing ->
@@ -232,38 +227,6 @@ update msg model =
         |> persist
     Broadcaster _ ->
       (model, Log.warn "broadcaster did not find that login name")
-    Hosts hosts ->
-      let
-        (cached, new) = hosts
-          |> List.take model.hostLimit
-          |> List.filter (\host -> List.all ((/=) host) model.hosts)
-          |> List.partition (\hostId ->
-              case Dict.get hostId model.clipCache of
-                Just (time, clips) ->
-                  (Time.posixToMillis time) < ((Time.posixToMillis model.time) - clipCacheTime)
-                Nothing -> False
-            )
-        requests = case model.auth of
-          Just auth ->
-            new
-              |> List.map (\hostId -> fetchClips auth otherClipCount hostId)
-          Nothing ->
-            []
-        choices = cached
-          |> List.concatMap (\hostId ->
-              case Dict.get hostId model.clipCache of
-                Just (time, clips) -> importClips hostId {model|hosts = hosts} clips
-                Nothing -> []
-              )
-          |> Array.fromList
-      in
-      ( { model
-        | hosts = hosts
-        , clips = Array.append model.clips choices
-        , pendingRequests = model.pendingRequests |> appendRequests requests
-        }
-      , maybePickCommand model
-      )
     Clips id clips ->
       let
         choices = importClips id model clips |> Array.fromList
@@ -306,17 +269,7 @@ update msg model =
       , Cmd.none
       )
     NextChoice time ->
-      ( { model
-        | pendingRequests = model.pendingRequests |> appendRequests
-          [ if model.hostLimit >= List.length model.hosts then
-              case (model.userId, model.auth) of
-                --(Just id, Just auth) -> fetchHosts auth id
-                _ -> Cmd.none
-            else
-              Cmd.none
-          ]
-        , time = time
-        }
+      ( { model | time = time }
       , pickCommand model
       )
     Response subMsg ->
@@ -338,7 +291,6 @@ update msg model =
         muserId = extractSearchArgument "userId" location
         mshowClip = extractSearchArgument "showClip" location
         mselfRate = extractSearchArgument "selfRate" location
-        mhostLimit = extractSearchArgument "hostLimit" location
         mauth = extractHashArgument "access_token" location
       in
         { model
@@ -348,19 +300,16 @@ update msg model =
         , auth = mauth
         , showClip = case Maybe.withDefault "true" mshowClip of
             "false" -> False
-            _ -> True
+            _ -> False
         , selfRate = mselfRate
           |> Maybe.andThen String.toFloat
           |> Maybe.withDefault 1.0
-        , hostLimit = mhostLimit
-          |> Maybe.andThen String.toInt
-          |> Maybe.withDefault requestLimit
         , pendingRequests = model.pendingRequests |> appendRequests
           ( case mauth of
               Just auth ->
                 ( case (muserId, mlogin) of
-                  (Just id, Just login) -> [] -- [ fetchHosts auth id ]
-                  (Just id, Nothing) -> [ fetchUserById auth id ] --fetchHosts auth id ] 
+                  (Just id, Just login) -> []
+                  (Just id, Nothing) -> [ fetchUserById auth id ]
                   (Nothing, Just login) -> [ fetchUserByName auth login ]
                   (Nothing, Nothing) -> [ fetchSelf auth ]
                 )
@@ -702,10 +651,6 @@ createQueryString model =
       Just <| Url.string "selfRate" (String.fromFloat model.selfRate)
     else
       Nothing
-  , if model.hostLimit < requestLimit then
-      Just <| Url.int "hostLimit" model.hostLimit
-    else
-    Nothing
   ]
     |> List.filterMap identity
 

@@ -1,3 +1,5 @@
+- switch to recent
+- duration is now in clips
 - excluded clips export
   - copy-paste may work with OBS 27
 - replace hosts with hostable
