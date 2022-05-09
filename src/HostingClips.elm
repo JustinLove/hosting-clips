@@ -8,6 +8,7 @@ import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Request as Helix
 import TwitchId
+import Pagination as Helix
 import View exposing (Choice(..))
 
 import Html
@@ -39,12 +40,16 @@ otherClipCount = 20
 clipCacheTime = 48 * 60 * 60 * 1000
 nameCacheTime = 30 * 24 * 60 * 60 * 1000
 
+type WhichRequest
+  = FirstRequest
+  | OtherRequest String
+
 type Msg
   = Loaded (LocalStorage.LoadResult Persist)
   | HttpError String Http.Error
   | Self (List User)
   | Broadcaster (List User)
-  | Clips UserId (List Clip)
+  | Clips UserId WhichRequest (Helix.Paginated (List Clip))
   | Pick (Bool, Float)
   | NextChoice Posix
   | Response Msg
@@ -205,7 +210,7 @@ update msg model =
             Just auth ->
               Cmd.batch
                 [ Navigation.pushUrl m2.navigationKey (createPath m2)
-                , fetchClips auth selfClipCount user.id
+                , fetchClips auth selfClipCount user.id FirstRequest
                 ]
             Nothing ->
                 Navigation.pushUrl m2.navigationKey (createPath m2)
@@ -226,16 +231,30 @@ update msg model =
         |> persist
     Broadcaster _ ->
       (model, Log.warn "broadcaster did not find that login name")
-    Clips id clips ->
+    Clips id which (Helix.Paginated mcursor clips) ->
       let
         choices = importClips id model clips |> Array.fromList
         m2 =
           { model
           | clips = Array.append model.clips choices
-          , clipCache = Dict.insert id (model.time, clips) model.clipCache
+          , clipCache = Dict.update id (\mx ->
+            case (which, mx) of
+              (FirstRequest, _) ->
+                Just (model.time, clips)
+              (OtherRequest _, Just (t, c)) ->
+                Just (t, List.append c clips)
+              (OtherRequest _, Nothing) ->
+                Just (model.time, clips)
+            )
+            model.clipCache
           , pendingRequests = model.pendingRequests |> appendRequests
-            (case (model.auth, clips) of
-              (Just auth, []) -> [fetchBroadcasterById auth id]
+            (case (model.auth, clips, mcursor) of
+              (Just auth, [], _) -> [fetchBroadcasterById auth id]
+              (Just auth, _, Just cursor) ->
+                if (List.length clips) == selfClipCount then
+                  [fetchClips auth selfClipCount id (OtherRequest cursor)]
+                else
+                  []
               _ -> []
             )
           }
@@ -389,6 +408,7 @@ importClips id model clips=
   else
     clips
       |> List.filter (notExcluded model.exclusions)
+      |> List.filter (notExcluded (currentClipIds model.clips))
       |> List.map (updateClipDuration model.durations)
       |> List.map (\clip ->
           if (Just id) == model.userId then
@@ -396,6 +416,19 @@ importClips id model clips=
           else
             ThanksClip clip
       )
+
+currentClipIds : Array Choice -> Set ClipId
+currentClipIds choices =
+  List.filterMap choiceId (Array.toList choices)
+    |> Set.fromList
+
+choiceId : Choice -> Maybe ClipId
+choiceId choice =
+  case choice of
+    ThanksClip clip -> Just clip.id
+    Thanks _ -> Nothing
+    SelfClip clip -> Just clip.id
+    NoHosts -> Nothing
 
 requestVideoDataForThanks : Choice -> Model -> Cmd Msg
 requestVideoDataForThanks thanks model =
@@ -405,7 +438,7 @@ requestVideoDataForThanks thanks model =
         (Nothing, Nothing) ->
           Cmd.batch
             [ Log.info ("backfill video url" ++ clip.id)
-            , fetchClips auth otherClipCount clip.broadcasterId
+            , fetchClips auth otherClipCount clip.broadcasterId FirstRequest
             ]
         _ -> Cmd.none
       )
@@ -414,7 +447,7 @@ requestVideoDataForThanks thanks model =
         (Nothing, Nothing) ->
           Cmd.batch
             [ Log.info ("backfill video url" ++ clip.id)
-            , fetchClips auth selfClipCount clip.broadcasterId
+            , fetchClips auth selfClipCount clip.broadcasterId FirstRequest
             ]
         _ -> Cmd.none
       )
@@ -481,9 +514,9 @@ resolveLoaded model =
             if (Time.posixToMillis time) + clipCacheTime > (Time.posixToMillis model.time) then
               [maybePickCommand model]
             else
-              [fetchClips auth selfClipCount id]
+              [fetchClips auth selfClipCount id FirstRequest]
           Nothing ->
-            [fetchClips auth selfClipCount id]
+            [fetchClips auth selfClipCount id FirstRequest]
       _ -> []
   in
   { model
@@ -608,18 +641,23 @@ fetchSelf auth =
     , url = fetchSelfUrl
     }
 
-fetchClipsUrl : Int -> UserId -> String
-fetchClipsUrl count id =
-  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (String.fromInt count)
+fetchClipsUrl : Int -> UserId -> WhichRequest -> String
+fetchClipsUrl count id which =
+  let
+    after = case which of
+      FirstRequest -> ""
+      OtherRequest cursor -> "&after=" ++ cursor
+  in
+  "https://api.twitch.tv/helix/clips?broadcaster_id=" ++ id ++ "&first=" ++ (String.fromInt count) ++ after
 
-fetchClips : String -> Int -> UserId -> Cmd Msg
-fetchClips auth count id =
+fetchClips : String -> Int -> UserId -> WhichRequest -> Cmd Msg
+fetchClips auth count id which =
   Helix.send <|
     { clientId = TwitchId.clientId
     , auth = auth
-    , decoder = Decode.clips
-    , tagger = httpResponse "clips" (Clips id)
-    , url = (fetchClipsUrl count id)
+    , decoder = Helix.paginated Decode.clips
+    , tagger = httpResponse "clips" (Clips id which)
+    , url = (fetchClipsUrl count id which)
     }
 
 updateClipDuration : Dict ClipId DurationInMilliseconds -> Clip -> Clip
