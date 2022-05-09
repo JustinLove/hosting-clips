@@ -233,18 +233,31 @@ update msg model =
       (model, Log.warn "broadcaster did not find that login name")
     Clips id which (Helix.Paginated mcursor clips) ->
       let
-        choices = importClips id model clips |> Array.fromList
+        cache =
+          (case (which, Dict.get id model.clipCache ) of
+            (FirstRequest, _) ->
+              clips
+            (OtherRequest _, Just (t, c)) ->
+              List.append c clips
+            (OtherRequest _, Nothing) ->
+              clips
+          )
+            |> mostRecent selfClipCount
+        choices = cache
+          |> importClips id model
+          |> Array.fromList
         m2 =
           { model
-          | clips = appendNewChoices model.clips choices
+          -- no longer handles multiple channels
+          | clips = choices
           , clipCache = Dict.update id (\mx ->
             case (which, mx) of
               (FirstRequest, _) ->
-                Just (model.time, clips)
+                Just (model.time, cache)
               (OtherRequest _, Just (t, c)) ->
-                Just (t, List.append c clips)
+                Just (t, cache)
               (OtherRequest _, Nothing) ->
-                Just (model.time, clips)
+                Just (model.time, cache)
             )
             model.clipCache
           , pendingRequests = model.pendingRequests |> appendRequests
@@ -433,6 +446,17 @@ choiceId choice =
     Thanks _ -> Nothing
     SelfClip clip -> Just clip.id
     NoHosts -> Nothing
+
+mostRecent : Int -> List Clip -> List Clip
+mostRecent count clips =
+  clips
+    |> List.sortBy (\clip ->
+      case clip.createdAt of
+        Just t -> Time.posixToMillis t
+        Nothing -> 0
+      )
+    |> List.reverse
+    |> List.take count
 
 requestVideoDataForThanks : Choice -> Model -> Cmd Msg
 requestVideoDataForThanks thanks model =
