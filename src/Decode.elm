@@ -40,8 +40,15 @@ clip =
     |> map2 (|>) Clip.embedUrl
     |> map2 (|>) Clip.broadcasterId
     |> map2 (|>) (Clip.broadcasterName |> map Just)
-    |> map2 (|>) (succeed Nothing)
+    |> map2 (|>) duration
     |> map2 (|>) thumbnail
+
+duration : Decoder (Maybe Int)
+duration =
+  float
+    |> map (\x -> round(x * 1000))
+    |> field "duration"
+    |> maybe
 
 thumbnail : Decoder (Maybe String)
 thumbnail =

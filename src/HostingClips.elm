@@ -236,7 +236,7 @@ update msg model =
         choices = importClips id model clips |> Array.fromList
         m2 =
           { model
-          | clips = Array.append model.clips choices
+          | clips = appendNewChoices model.clips choices
           , clipCache = Dict.update id (\mx ->
             case (which, mx) of
               (FirstRequest, _) ->
@@ -358,8 +358,8 @@ update msg model =
             , clips = model.clips
               |> Array.filter (\choice ->
                 case choice of
-                  ThanksClip clip -> notExcluded model.exclusions clip
-                  SelfClip clip -> notExcluded model.exclusions clip
+                  ThanksClip clip -> clipNotExcluded model.exclusions clip
+                  SelfClip clip -> clipNotExcluded model.exclusions clip
                   _ -> True
                 )
             }
@@ -374,7 +374,6 @@ update msg model =
       ( { model | clipFilter = query }
       , Cmd.none)
     UI (View.ClipDuration id seconds) ->
-      --let _ = Debug.log id seconds in
       let
         duration = round (seconds * 1000)
         updateChoiceDuration choice =
@@ -407,8 +406,7 @@ importClips id model clips=
       [Thanks id]
   else
     clips
-      |> List.filter (notExcluded model.exclusions)
-      |> List.filter (notExcluded (currentClipIds model.clips))
+      |> List.filter (clipNotExcluded model.exclusions)
       |> List.map (updateClipDuration model.durations)
       |> List.map (\clip ->
           if (Just id) == model.userId then
@@ -417,8 +415,14 @@ importClips id model clips=
             ThanksClip clip
       )
 
-currentClipIds : Array Choice -> Set ClipId
-currentClipIds choices =
+appendNewChoices : Array Choice -> Array Choice -> Array Choice
+appendNewChoices older newer =
+  Array.append
+    (Array.filter (choiceNotExcluded (choiceClipIds newer)) older)
+    newer
+
+choiceClipIds : Array Choice -> Set ClipId
+choiceClipIds choices =
   List.filterMap choiceId (Array.toList choices)
     |> Set.fromList
 
@@ -520,7 +524,7 @@ resolveLoaded model =
       _ -> []
   in
   { model
-  | clips = Array.append model.clips (Array.fromList choices)
+  | clips = appendNewChoices (Array.fromList choices) model.clips
   , pendingRequests = model.pendingRequests |> appendRequests requests
   }
 
@@ -579,9 +583,16 @@ isSelf choice =
     SelfClip _ -> True
     _ -> False
 
-notExcluded : Set ClipId -> Clip -> Bool
-notExcluded exclusions clip =
+clipNotExcluded : Set ClipId -> Clip -> Bool
+clipNotExcluded exclusions clip =
   not <| Set.member clip.id exclusions
+
+choiceNotExcluded : Set ClipId -> Choice -> Bool
+choiceNotExcluded exclusions choice =
+  case choice of
+    SelfClip clip -> clipNotExcluded exclusions clip
+    ThanksClip clip -> clipNotExcluded exclusions clip
+    _ -> True
 
 httpResponse : String -> (a -> Msg)-> Result Http.Error a -> Msg
 httpResponse source success result =
@@ -662,7 +673,9 @@ fetchClips auth count id which =
 
 updateClipDuration : Dict ClipId DurationInMilliseconds -> Clip -> Clip
 updateClipDuration durations clip =
-  { clip | duration = Dict.get clip.id durations }
+  case clip.duration of
+    Just _ -> clip
+    Nothing -> { clip | duration = Dict.get clip.id durations }
 
 displayNameForHost : Dict UserId String -> UserId -> Maybe String
 displayNameForHost names id =

@@ -37,7 +37,7 @@ clip =
     |> map2 (|>) (field "embedUrl" string)
     |> map2 (|>) (field "broadcasterId" string)
     |> map2 (|>) (maybe (field "broadcasterName" string))
-    |> map2 (|>) (succeed Nothing)
+    |> map2 (|>) (maybe (field "duration" int))
     |> map2 (|>) (maybe (field "videoUrl" string))
 
 nameCache : Decoder (Dict UserId (Posix, String))

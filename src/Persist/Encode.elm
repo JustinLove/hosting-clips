@@ -42,6 +42,10 @@ clip c =
       Just name -> [("broadcasterName", string name)]
       Nothing -> []
     )
+    |> List.append (case c.duration of
+      Just duration -> [("duration", int duration)]
+      Nothing -> []
+    )
     |> object
 
 nameCache : Dict UserId (Posix, String) -> Value
