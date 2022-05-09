@@ -18,6 +18,7 @@ type alias Clip =
   , broadcasterName : Maybe String
   , duration : Maybe DurationInMilliseconds
   , videoUrl : Maybe String
+  , createdAt : Maybe Posix
   }
 
 type alias DurationInMilliseconds = Int

@@ -42,6 +42,7 @@ clip =
     |> map2 (|>) (Clip.broadcasterName |> map Just)
     |> map2 (|>) duration
     |> map2 (|>) thumbnail
+    |> map2 (|>) (Clip.createdAt |> map Just)
 
 duration : Decoder (Maybe Int)
 duration =

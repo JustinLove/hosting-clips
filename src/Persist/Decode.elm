@@ -39,6 +39,7 @@ clip =
     |> map2 (|>) (maybe (field "broadcasterName" string))
     |> map2 (|>) (maybe (field "duration" int))
     |> map2 (|>) (maybe (field "videoUrl" string))
+    |> map2 (|>) (maybe (field "createdAt" (map Time.millisToPosix int)))
 
 nameCache : Decoder (Dict UserId (Posix, String))
 nameCache =

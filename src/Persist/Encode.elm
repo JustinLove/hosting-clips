@@ -46,6 +46,10 @@ clip c =
       Just duration -> [("duration", int duration)]
       Nothing -> []
     )
+    |> List.append (case c.createdAt of
+      Just createdAt -> [("createdAt", int <| Time.posixToMillis createdAt)]
+      Nothing -> []
+    )
     |> object
 
 nameCache : Dict UserId (Posix, String) -> Value
