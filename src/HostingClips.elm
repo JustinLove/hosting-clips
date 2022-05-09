@@ -7,7 +7,6 @@ import Persist exposing (Persist, Clip, DurationInMilliseconds, UserId, ClipId)
 import Persist.Encode
 import Persist.Decode
 import Twitch.Helix.Request as Helix
---import Twitch.Kraken.Request as Kraken
 import TwitchId
 import View exposing (Choice(..))
 
@@ -300,7 +299,7 @@ update msg model =
         , auth = mauth
         , showClip = case Maybe.withDefault "true" mshowClip of
             "false" -> False
-            _ -> False
+            _ -> True
         , selfRate = mselfRate
           |> Maybe.andThen String.toFloat
           |> Maybe.withDefault 1.0
@@ -477,10 +476,14 @@ resolveLoaded model =
       Nothing -> []
     requests = case (model.auth, model.userId) of
       (Just auth, Just id) ->
-        if Dict.member id model.clipCache then
-          [maybePickCommand model]
-        else
-          [fetchClips auth selfClipCount id]
+        case Dict.get id model.clipCache of
+          Just (time, _) ->
+            if (Time.posixToMillis time) + clipCacheTime > (Time.posixToMillis model.time) then
+              [maybePickCommand model]
+            else
+              [fetchClips auth selfClipCount id]
+          Nothing ->
+            [fetchClips auth selfClipCount id]
       _ -> []
   in
   { model
